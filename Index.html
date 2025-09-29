@@ -1,286 +1,626 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Global Meet</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%2360a5fa'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-size='28' fill='white' font-family='Arial,Helvetica,sans-serif'%3EG%3C/text%3E%3C/svg%3E"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root{ color-scheme: dark }
-    .tile { aspect-ratio: 16 / 9 }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Global Meet — Local Mesh (Reliable + Present)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{color-scheme:dark}
+  .tile{aspect-ratio:16/9}
+  .talk-ring{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+  .talk-dot{width:3rem;height:3rem;border-radius:9999px;background:radial-gradient(circle at 50% 50%,rgba(59,130,246,.9),rgba(59,130,246,.35));box-shadow:0 0 .5rem rgba(59,130,246,.7);transform:scale(.9);transition:transform 80ms linear,box-shadow 80ms linear}
+  details>summary{cursor:pointer}
+  .kbd{border:1px solid #334;padding:.05rem .35rem;border-radius:.375rem;background:#0b1220;font-size:.8em}
+</style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
-  <header class="flex items-center justify-between gap-3 px-4 h-14 border-b border-slate-800 bg-slate-950/80">
-    <div class="flex items-center gap-2">
-      <span class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">Global Room</span>
-      <code id="roomCode" class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">global</code>
-      <button id="copyLink" class="text-xs px-2 py-1 rounded-md border border-blue-700 bg-blue-600 hover:bg-blue-500">Copy link</button>
-    </div>
-    <div class="text-sm text-slate-400" id="status">initializing…</div>
-  </header>
 
-  <main class="flex-1 min-h-0 flex flex-col">
-    <section id="grid" class="grid gap-2 p-2" style="grid-template-columns: repeat(1,minmax(0,1fr))">
-      <!-- tiles injected here -->
-    </section>
+<header class="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-slate-800 bg-slate-950/80">
+  <div class="flex items-center gap-2 min-w-[14rem]">
+    <span class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">Global Room</span>
+    <code class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">local mesh</code>
+  </div>
 
-    <div class="flex items-center justify-center py-4 border-t border-slate-800 bg-slate-950/80">
-      <div class="flex items-center gap-3 px-3 py-2 rounded-full border border-slate-700 bg-slate-900/90 shadow-lg">
-        <button id="micBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Toggle microphone" aria-pressed="false">
-          <svg id="micOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2zM7 22h10v-2H7z"/></svg>
-          <svg id="micOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 hidden"><path d="M19 11a7 7 0 0 1-7 7v3h-2v-3a7 7 0 0 1-6-7h2a5 5 0 0 0 10 0h2zM12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-5.12 2.1L15 7.98V6a3 3 0 0 0-3-3z"/></svg>
-        </button>
-        <button id="deafenBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Deafen (mute incoming)" aria-pressed="false">
-          <svg id="deafenOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-4.5-4.5v-2A6.5 6.5 0 0 1 18.5 12h-2zM17 12a3 3 0 0 0-3-3v2a1 1 0 0 1 1 1h2z"/></svg>
-          <svg id="deafenOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 hidden"><path d="M3.27 2 2 3.27 7.73 9H3v6h4l5 5v-6.73l5.73 5.73L20 20.73 3.27 2zM14 3.97v2.02a6.5 6.5 0 0 1 6.5 6.5h-2A4.5 4.5 0 0 0 14 6z"/></svg>
-        </button>
-        <button id="leaveBtn" class="w-12 h-12 rounded-full grid place-items-center bg-red-800 hover:bg-red-700" title="Leave call">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M5 15c3.866-3.866 10.134-3.866 14 0l3-3C16.5 6.5 7.5 6.5 2 12l3 3z"/></svg>
-        </button>
-      </div>
-    </div>
-  </main>
+  <div class="flex items-center gap-2">
+    <label class="text-xs text-slate-400">Mic</label>
+    <select id="micSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
+    <button id="micRetest" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700">Retest</button>
+  </div>
 
-  <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-4 px-3 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm hidden"></div>
+  <div class="flex items-center gap-2">
+    <label class="text-xs text-slate-400">Speaker</label>
+    <select id="spkSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
+  </div>
 
-  <!-- Name join overlay -->
-  <div id="joinOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm grid place-items-center">
-    <div class="w-full max-w-md mx-auto p-6 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
-      <h2 class="text-lg font-semibold mb-2">Join Global Room</h2>
-      <p class="text-sm text-slate-400 mb-4">Choose a display name and click Join.</p>
-      <div class="flex items-center gap-2">
-        <input id="nameInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Your name" />
-        <button id="joinBtn" class="px-4 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500">Join</button>
-      </div>
+  <div class="ml-auto text-sm text-slate-400" id="status">initializing…</div>
+</header>
+
+<main class="flex-1 min-h-0 flex flex-col">
+  <section id="grid" class="grid gap-2 p-2" style="grid-template-columns:repeat(1,minmax(0,1fr))"></section>
+
+  <div class="flex items-center justify-center py-4 border-t border-slate-800 bg-slate-950/80">
+    <div class="flex items-center gap-3 px-3 py-2 rounded-full border border-slate-700 bg-slate-900/90 shadow-lg">
+      <button id="micBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Toggle microphone" aria-pressed="false">
+        <svg id="micOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2zM7 22h10v-2H7z"/></svg>
+        <svg id="micOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6 hidden"><path fill="currentColor" d="M19 11a7 7 0 0 1-7 7v3h-2v-3a7 7 0 0 1-6-7h2a5 5 0 0 0 10 0h2zM12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-5.12 2.1L15 7.98V6a3 3 0 0 0-3-3z"/></svg>
+      </button>
+
+      <button id="deafenBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Mute speakers" aria-pressed="false">
+        <svg id="deafenOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-4.5-4.5v-2A6.5 6.5 0 0 1 18.5 12h-2zM17 12a3 3 0 0 0-3-3v2a1 1 0 0 1 1 1h2z"/></svg>
+        <svg id="deafenOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6 hidden"><path fill="currentColor" d="M3.27 2 2 3.27 7.73 9H3v6h4l5 5v-6.73l5.73 5.73L20 20.73 3.27 2zM14 3.97v2.02a6.5 6.5 0 0 1 6.5 6.5h-2A4.5 4.5 0 0 0 14 6z"/></svg>
+      </button>
+
+      <button id="monitorBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-blue-700 hover:bg-blue-600 text-xs" aria-pressed="true" title="Hear your own mic">
+        Monitor: On
+      </button>
+      <input id="monitorGain" type="range" min="0" max="100" value="35" class="w-28" title="Monitor volume">
+
+      <!-- NEW: Present button -->
+      <button id="presentBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs" aria-pressed="false" title="Share your screen">
+        Present
+      </button>
+
+      <button id="speakerTest" class="text-xs px-2 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700">Speaker test</button>
+      <button id="leaveBtn" class="w-12 h-12 rounded-full grid place-items-center bg-red-800 hover:bg-red-700" title="Leave">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M5 15c3.866-3.866 10.134-3.866 14 0l3-3C16.5 6.5 7.5 6.5 2 12l3 3z"/></svg>
+      </button>
     </div>
   </div>
 
-  <!-- Client-side signaling libs (public hubs) -->
-  <script src="https://unpkg.com/signalhub@5.5.1/signalhub.min.js"></script>
-  <script src="https://unpkg.com/webrtc-swarm@3.35.0/index.js"></script>
-  <script>
-  (async function(){
-    const statusEl = document.getElementById('status');
-    const grid = document.getElementById('grid');
-    const toast = document.getElementById('toast');
-    const copyLinkBtn = document.getElementById('copyLink');
-    const micBtn = document.getElementById('micBtn');
-    const deafenBtn = document.getElementById('deafenBtn');
-    const leaveBtn = document.getElementById('leaveBtn');
-    const micOn = document.getElementById('micOn');
-    const micOff = document.getElementById('micOff');
-    const deafenOn = document.getElementById('deafenOn');
-    const deafenOff = document.getElementById('deafenOff');
+  <details class="px-4 pb-3 text-xs text-slate-400">
+    <summary>Diagnostics</summary>
+    <div id="diag" class="mt-2 font-mono whitespace-pre-wrap"></div>
+  </details>
+</main>
 
-    // Global room (single room for everyone)
-    const APP = 'global-meet';
-    const HUBS = [
-      'https://signalhub-jccqtwhdwc.now.sh',
-      'https://signalhub.p2p.party'
-    ];
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-4 px-3 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm hidden"></div>
 
-    const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+<!-- Join overlay -->
+<div id="joinOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm grid place-items-center">
+  <div class="w-full max-w-md mx-auto p-6 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
+    <h2 class="text-lg font-semibold mb-2">Join Global Room</h2>
+    <p class="text-sm text-slate-400 mb-4">Choose a display name and click Join.</p>
+    <div class="flex items-center gap-2">
+      <input id="nameInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Your name"/>
+      <button id="joinBtn" class="px-4 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500">Join</button>
+    </div>
+    <p id="httpsWarn" class="mt-3 text-xs text-amber-400 hidden">Serve over <b>http://localhost</b> or <b>https://</b> for mic access. <span class="kbd">file://</span> will not work reliably.</p>
+    <p class="mt-2 text-xs text-slate-500">If no mic prompt: click the lock icon → allow Microphone → press <span class="kbd">Retest</span>.</p>
+  </div>
+</div>
 
-    function updateLayout(){
-      const n = document.querySelectorAll('#grid .tile').length;
-      let cols = 1;
-      if (n === 1) cols = 1;
-      else if (n === 2) cols = 2;
-      else if (n <= 4) cols = 2;
-      else if (n <= 6) cols = 3;
-      else if (n <= 9) cols = 3;
-      else cols = 4;
-      document.getElementById('grid').style.gridTemplateColumns = repeat(${cols}, minmax(0, 1fr));
-    }
+<script>
+(function(){
+  // ---------- DOM ----------
+  const statusEl = document.getElementById('status');
+  const grid = document.getElementById('grid');
+  const toast = document.getElementById('toast');
+  const micBtn = document.getElementById('micBtn');
+  const deafenBtn = document.getElementById('deafenBtn');
+  const leaveBtn = document.getElementById('leaveBtn');
+  const micOn = document.getElementById('micOn');
+  const micOff = document.getElementById('micOff');
+  const micSelect = document.getElementById('micSelect');
+  const spkSelect = document.getElementById('spkSelect');
+  const micRetest = document.getElementById('micRetest');
+  const monitorBtn = document.getElementById('monitorBtn');
+  const monitorGain = document.getElementById('monitorGain');
+  const speakerTestBtn = document.getElementById('speakerTest');
+  const presentBtn = document.getElementById('presentBtn'); // NEW
+  const diag = document.getElementById('diag');
 
-    function show(t){ toast.textContent=t; toast.classList.remove('hidden'); clearTimeout(show._t); show._t = setTimeout(()=>toast.classList.add('hidden'), 1200); }
-    async function copyLink(){ try{ await navigator.clipboard.writeText(location.href); show('Link copied'); } catch { show('Copy failed'); } }
-    copyLinkBtn.onclick = copyLink;
+  // ---------- Env checks ----------
+  const isSecure = (window.isSecureContext || /^https?:\/\/localhost/i.test(location.href));
+  const SAME_URL_KEY = location.origin + location.pathname; // both tabs must match this EXACTLY
+  if (!isSecure) document.getElementById('httpsWarn').classList.remove('hidden');
 
-    // Name selection overlay and join flow
-    const joinOverlay = document.getElementById('joinOverlay');
-    const nameInput = document.getElementById('nameInput');
-    const joinBtn = document.getElementById('joinBtn');
-    nameInput.value = localStorage.getItem('displayName') || '';
-    let displayName = '';
+  function show(t){ toast.textContent=t; toast.classList.remove('hidden'); clearTimeout(show._t); show._t=setTimeout(()=>toast.classList.add('hidden'),1500); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function updateLayout(){
+    const n = document.querySelectorAll('#grid .tile').length;
+    let cols=1; if(n===1)cols=1; else if(n===2)cols=2; else if(n<=4)cols=2; else if(n<=6)cols=3; else if(n<=9)cols=3; else cols=4;
+    grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+  }
+  async function unlockAudio(){
+    document.querySelectorAll('audio,video').forEach(a=>{ try{ a.play(); }catch{} });
+    try{ const ctx = new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') await ctx.resume(); ctx.close(); }catch{}
+  }
+  async function logDiag(note, extra){
+    const ts = new Date().toISOString().slice(11,19);
+    diag.textContent += `[${ts}] ${note}${extra?': '+extra:''}\n`;
+  }
+  function refreshStatus(){ statusEl.textContent = `Online • ${peers.size} peer${peers.size===1?'':'s'}`; }
 
-    // Media
-    let localStream = null;
-    async function getMedia(){
-      statusEl.textContent = 'Requesting microphone…';
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
-        statusEl.textContent = 'Ready • waiting for peers';
-      } catch (e) {
-        statusEl.textContent = 'No microphone available';
-        show('Microphone permission blocked');
-        return false;
+  // ---------- State ----------
+  const joinOverlay = document.getElementById('joinOverlay');
+  const nameInput = document.getElementById('nameInput');
+  const joinBtn = document.getElementById('joinBtn');
+  nameInput.value = localStorage.getItem('displayName') || '';
+
+  let displayName = '';
+  let localStream = null;
+  let currentMicId = null;
+  let monitorCtx = null, monitorGainNode = null, monitorSource = null;
+
+  // Screen share state (NEW)
+  let screenStream = null;                     // your local display stream
+  const screenSenders = new Map();             // peerId -> RTCRtpSender
+  const peerNames = new Map();                 // peerId -> name for labeling screens
+
+  // ---------- Signaling: BroadcastChannel + localStorage ----------
+  const bc = (typeof BroadcastChannel!=='undefined') ? new BroadcastChannel('global-meet-local') : null;
+  const LS_KEY = 'gmeet-signal';
+  const myId = (crypto && crypto.randomUUID) ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10);
+  const peers = new Map(); // id -> RTCPeerConnection
+  const iceConfig = { iceServers:[{urls:'stun:stun.l.google.com:19302'}] };
+
+  function send(msg){
+    msg.url = SAME_URL_KEY; // only listen to same-url peers
+    msg.from = myId;
+    try{ bc && bc.postMessage(msg); }catch{}
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(msg)+'::'+Math.random()); }catch{}
+  }
+  function onSignal(msg){
+    if (!msg || msg.url !== SAME_URL_KEY) return;
+    if (msg.from === myId) return;
+    handleSignal(msg);
+  }
+  bc && (bc.onmessage = (e)=>onSignal(e.data));
+  window.addEventListener('storage', (e)=>{
+    if (e.key !== LS_KEY || !e.newValue) return;
+    try{ const raw = e.newValue.split('::')[0]; onSignal(JSON.parse(raw)); }catch{}
+  });
+
+  // ---------- UI tiles ----------
+  function ensureTile(id){
+    let el = document.querySelector(`[data-peer="${id}"]`);
+    if (el) return el;
+    el = document.createElement('div');
+    el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
+    el.dataset.peer = id;
+    el.innerHTML = `
+      <audio autoplay playsinline></audio>
+      <div class="talk-ring"><div class="talk-dot" data-dot></div></div>
+      <div class="absolute inset-0 grid place-items-center pointer-events-none">
+        <div class="w-16 h-16 rounded-full bg-blue-500/80 ring-2 ring-white/30 text-white grid place-items-center text-2xl font-semibold" data-initial>?</div>
+      </div>
+      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>${id.slice(0,6)}</div>`;
+    grid.append(el); updateLayout();
+    return el;
+  }
+  // Screen tile (NEW)
+  function ensureShareTile(ownerId, labelText){
+    let el = document.querySelector(`[data-share="${ownerId}"]`);
+    if (el) return el;
+    el = document.createElement('div');
+    el.className = 'tile relative rounded-xl overflow-hidden bg-slate-800';
+    el.dataset.share = ownerId;
+    el.innerHTML = `
+      <video autoplay playsinline muted class="w-full h-full object-contain bg-black"></video>
+      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60">
+        ${escapeHtml(labelText || 'Screen')}
+      </div>`;
+    grid.append(el); updateLayout();
+    return el;
+  }
+  function removeShareTile(ownerId){
+    const el = document.querySelector(`[data-share="${ownerId}"]`);
+    if (el) el.remove();
+    updateLayout();
+  }
+
+  function labelPeer(id, name){
+    const el = document.querySelector(`[data-peer="${id}"] [data-label]`);
+    if (el) el.textContent = name;
+    const badge = document.querySelector(`[data-peer="${id}"] [data-initial]`);
+    if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase();
+  }
+
+  // ---------- VAD dot ----------
+  const peerAnalyzers = new Map();
+  function startVADFor(id, stream){
+    stopVADFor(id);
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser(); an.fftSize = 2048; src.connect(an);
+      const data = new Uint8Array(an.fftSize);
+      const dot = document.querySelector(`[data-peer="${id}"] [data-dot]`);
+      let raf=0; const loop=()=>{
+        an.getByteTimeDomainData(data);
+        let sum=0; for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; sum+=v*v; }
+        const rms=Math.sqrt(sum/data.length);
+        const scale=0.9+Math.min(1.5, rms*6);
+        if (dot){ dot.style.transform=`scale(${scale.toFixed(3)})`; dot.style.boxShadow=`0 0 ${Math.max(.5, rms*12).toFixed(2)}rem rgba(59,130,246,.85)`; }
+        raf=requestAnimationFrame(loop);
+      }; loop();
+      peerAnalyzers.set(id,{ctx,raf});
+    }catch{}
+  }
+  function stopVADFor(id){
+    const r = peerAnalyzers.get(id); if(!r) return;
+    try{ cancelAnimationFrame(r.raf); }catch{}
+    try{ r.ctx.close(); }catch{}
+    peerAnalyzers.delete(id);
+  }
+
+  // ---------- RTCPeerConnection ----------
+  function createPC(id){
+    const pc = new RTCPeerConnection(iceConfig);
+    try{ pc.addTransceiver('audio',{direction:'recvonly'}); }catch{}
+    try{ pc.addTransceiver('video',{direction:'recvonly'}); }catch{} // ready to receive screen video
+
+    // send mic if we have it
+    if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+
+    // if we're already presenting when a new peer appears, add our screen track to them
+    if (screenStream){
+      const vTrack = screenStream.getVideoTracks()[0];
+      if (vTrack){
+        const sender = pc.addTrack(vTrack, screenStream);
+        screenSenders.set(id, sender);
       }
-      return true;
     }
 
-    function addSelfTile(){
-      const you = document.createElement('div'); you.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-amber-900 to-amber-800';
-      you.innerHTML = '\
-        <div class="absolute inset-0 grid place-items-center pointer-events-none">\
-          <div class="w-16 h-16 rounded-full bg-orange-500/90 ring-2 ring-white/40 text-white grid place-items-center text-2xl font-semibold">'+escapeHtml(displayName.charAt(0).toUpperCase())+'</div>\
-        </div>\
-        <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60">'+escapeHtml(displayName)+' (you)</div>';
-      grid.prepend(you);
-      updateLayout();
-    }
+    pc.ontrack = (e)=>{
+      const [stream] = e.streams;
+      const track = e.track;
 
-    async function beginJoin(){
-      displayName = (nameInput.value || '').trim() || 'Guest';
-      localStorage.setItem('displayName', displayName);
-      joinOverlay.classList.add('hidden');
-      if (!(await getMedia())) return;
-      addSelfTile();
-      await connectNetwork();
-    }
-    joinBtn.onclick = beginJoin;
-
-    let swarm = null;
-    const peers = new Map(); // unified peers
-    let deafened = false;
-
-    async function connectNetwork(){
-      statusEl.textContent = 'Connecting to network…';
-      try {
-        if (!window.signalhub) throw new Error('signalhub not loaded');
-        const hub = signalhub(APP, HUBS);
-        const SwarmCtor = window.Swarm || window.WebRTCSwarm || window.default;
-        if (!SwarmCtor) throw new Error('webrtc-swarm not loaded');
-        swarm = SwarmCtor(hub, { stream: localStream, config: { iceServers: ICE } });
-        statusEl.textContent = 'Ready • waiting for peers';
-        wireSwarm();
-      } catch (e) {
-        console.warn('Signaling libraries unavailable:', e);
-        statusEl.textContent = 'Local test mode • open a second tab';
-        wireLocalBroadcast();
-      }
-      setTimeout(() => refreshStatus(), 1500);
-      setInterval(() => refreshStatus(), 5000);
-    }
-
-    // const peers declared above (unified for swarm/local)
-
-    function refreshStatus(){ statusEl.textContent = Online • ${peers.size} peer${peers.size===1?'':'s'}; }
-
-    swarm && swarm.on('peer', (peer, id) => {
-      peers.set(id, peer);
-      refreshStatus();
-      peer.on('stream', (stream) => addRemoteTile(id, stream));
-      peer.on('connect', () => { try { peer.send(JSON.stringify({ type:'meta', name: displayName })); } catch {} });
-      peer.on('data', (buf) => {
-        try {
-          const msg = JSON.parse(String(buf));
-          if (msg && msg.type === 'meta' && msg.name) labelPeer(id, msg.name);
-        } catch {}
-      });
-      peer.on('close', () => { removeRemote(id); refreshStatus(); });
-      peer.on('error', () => { removeRemote(id); refreshStatus(); });
-    });
-    // Best-effort hub error notice (optional)
-    // Note: if offline (no swarm), you can still use mic locally
-
-    // Local tab-to-tab fallback signaling using BroadcastChannel
-    function wireLocalBroadcast(){
-      const channel = new BroadcastChannel('global-meet-local');
-      const myId = Math.random().toString(36).slice(2,10);
-      const conns = new Map();
-
-      function createPC(id){
-        const pc = new RTCPeerConnection({ iceServers: ICE });
-        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-        pc.ontrack = (e)=>{ const [s] = e.streams; addRemoteTile(id, s); };
-        pc.onicecandidate = (e)=>{ if (e.candidate) channel.postMessage({ t:'ice', to:id, from:myId, c:e.candidate }); };
-        pc.onconnectionstatechange = ()=>{ if (pc.connectionState==='disconnected' || pc.connectionState==='failed') { removeRemote(id); } };
-        conns.set(id, pc); peers.set(id, pc); refreshStatus();
-        return pc;
-      }
-
-      channel.onmessage = async (ev)=>{
-        const m = ev.data || {}; if (m.from === myId) return;
-        if (m.t === 'hello'){
-          if (myId > m.from){ const pc = createPC(m.from); const offer = await pc.createOffer(); await pc.setLocalDescription(offer); channel.postMessage({ t:'offer', to:m.from, from:myId, s:pc.localDescription }); }
-        } else if (m.t === 'offer' && m.to === myId){
-          const pc = createPC(m.from); await pc.setRemoteDescription(m.s); const ans = await pc.createAnswer(); await pc.setLocalDescription(ans); channel.postMessage({ t:'answer', to:m.from, from:myId, s:pc.localDescription });
-        } else if (m.t === 'answer' && m.to === myId){
-          const pc = conns.get(m.from); if (pc) await pc.setRemoteDescription(m.s);
-        } else if (m.t === 'ice' && m.to === myId){
-          const pc = conns.get(m.from); if (pc && m.c) try{ await pc.addIceCandidate(m.c); } catch{}
-        } else if (m.t === 'bye'){
-          const pc = conns.get(m.from); if (pc) pc.close(); conns.delete(m.from); removeRemote(m.from); peers.delete(m.from); refreshStatus();
-        } else if (m.t === 'meta'){
-          labelPeer(m.from, m.name);
+      if (track.kind === 'audio'){
+        const el = ensureTile(id);
+        const a = el.querySelector('audio');
+        if (a){
+          a.srcObject = stream;
+          a.muted = deafenBtn.getAttribute('aria-pressed')==='true';
+          a.play().catch(()=>{});
+          const sink = spkSelect.value; if (sink && typeof a.setSinkId==='function') a.setSinkId(sink).catch(()=>{});
         }
-      };
-
-      channel.postMessage({ t:'hello', from:myId });
-      channel.postMessage({ t:'meta', from:myId, name: localStorage.getItem('displayName') || 'Guest' });
-      window.addEventListener('beforeunload',()=>{ channel.postMessage({ t:'bye', from:myId }); conns.forEach(pc=>pc.close()); });
-    }
-
-    // UI actions
-    micBtn.onclick = () => {
-      const track = localStream.getAudioTracks()[0];
-      if (!track) return;
-      track.enabled = !track.enabled;
-      micOn.classList.toggle('hidden', !track.enabled);
-      micOff.classList.toggle('hidden', track.enabled);
-      micBtn.setAttribute('aria-pressed', String(!track.enabled));
-      micBtn.classList.toggle('bg-red-700', !track.enabled);
-      micBtn.classList.toggle('hover:bg-red-600', !track.enabled);
-      micBtn.classList.toggle('bg-slate-800', track.enabled);
-      micBtn.classList.toggle('hover:bg-slate-700', track.enabled);
-      show(track.enabled ? 'Unmuted' : 'Muted');
-    };
-    let deafened = false;
-    deafenBtn.onclick = () => {
-      deafened = !deafened;
-      document.querySelectorAll('[data-peer] audio').forEach(a => a.muted = deafened);
-      document.querySelectorAll('[data-peer] audio').forEach(a => { try { a.play(); } catch {} });
-      deafenBtn.setAttribute('aria-pressed', String(deafened));
-      deafenBtn.classList.toggle('bg-yellow-700', deafened);
-      deafenBtn.classList.toggle('hover:bg-yellow-600', deafened);
-      deafenBtn.classList.toggle('bg-slate-800', !deafened);
-      deafenBtn.classList.toggle('hover:bg-slate-700', !deafened);
-      document.getElementById('deafenOn').classList.toggle('hidden', deafened);
-      document.getElementById('deafenOff').classList.toggle('hidden', !deafened);
-      show(deafened ? 'Deafened' : 'Undeafened');
-    };
-    leaveBtn.onclick = () => { cleanup(); location.reload(); };
-    // (Camera and screen share removed by request)
-
-    function addRemoteTile(id, stream){
-      let el = document.querySelector('[data-peer="'+id+'"]');
-      if (!el){
-        el = document.createElement('div');
-        el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-amber-900 to-amber-800';
-        el.dataset.peer = id;
-        el.innerHTML = '\
-          <audio autoplay class="hidden"></audio>\
-          <div class="absolute inset-0 grid place-items-center pointer-events-none">\
-            <div class="w-16 h-16 rounded-full bg-orange-500/90 ring-2 ring-white/40 text-white grid place-items-center text-2xl font-semibold" data-initial>?</div>\
-          </div>\
-          <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>'+id.slice(0,6)+'</div>';
-        grid.append(el);
+        startVADFor(id, stream);
       }
-      const audio = el.querySelector('audio');
-      if (audio) { audio.srcObject = stream; audio.muted = document.getElementById('deafenBtn')?.getAttribute('aria-pressed') === 'true'; try { audio.play(); } catch {} }
-      updateLayout();
-      // Always show initial badge (name only UI)
-    }
-    function labelPeer(id, name){ const el = document.querySelector('[data-peer="'+id+'"] [data-label]'); if (el) el.textContent = name; const badge = document.querySelector('[data-peer="'+id+'"] [data-initial]'); if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase(); }
-    function removeRemote(id){ const el = document.querySelector('[data-peer="'+id+'"]'); if (el) el.remove(); peers.delete(id); updateLayout(); }
-    function cleanup(){ try { swarm.close(); } catch {} peers.forEach(p=>{ try{p.destroy()}catch{} }); if (localStream) localStream.getTracks().forEach(t=>t.stop()); }
 
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-    window.addEventListener('beforeunload', cleanup);
-  })();
-  </script>
+      if (track.kind === 'video'){
+        const label = `${peerNames.get(id) || id.slice(0,6)} — Screen`;
+        const shareEl = ensureShareTile(id, label);
+        const v = shareEl.querySelector('video');
+        if (v){ v.srcObject = stream; v.play().catch(()=>{}); }
+        track.onended = ()=> removeShareTile(id);
+      }
+    };
+
+    pc.onicecandidate = (e)=>{ if (e.candidate) send({t:'ice', to:id, c:e.candidate}); };
+    pc.onconnectionstatechange = ()=>{
+      const s = pc.connectionState;
+      if (s==='closed'||s==='failed'||s==='disconnected'){ removePeer(id); }
+    };
+    peers.set(id, pc); ensureTile(id); refreshStatus(); return pc;
+  }
+
+  async function makeOffer(to){
+    const pc = peers.get(to) || createPC(to);
+    // if screen is active, the presence of a video sender ensures m=video
+    const offer = await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+    await pc.setLocalDescription(offer);
+    send({t:'offer', to, s:pc.localDescription});
+  }
+  async function makeAnswer(from, sdp){
+    const pc = peers.get(from) || createPC(from);
+    await pc.setRemoteDescription(sdp);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    send({t:'answer', to:from, s:pc.localDescription});
+  }
+  async function renegotiateAll(){ for(const id of peers.keys()){ try{ await makeOffer(id); }catch{} } }
+  function removePeer(id){
+    stopVADFor(id);
+    const sender = screenSenders.get(id);
+    if (sender){ try{ sender.transport && sender.transport.stop && sender.transport.stop(); }catch{} screenSenders.delete(id); }
+    const pc = peers.get(id); if(pc) try{pc.close();}catch{}
+    peers.delete(id);
+    const el = document.querySelector(`[data-peer="${id}"]`); if(el) el.remove();
+    removeShareTile(id); // remove their screen if any
+    refreshStatus();
+  }
+
+  // ---------- Screen share (Present) ----------
+  async function startPresent(){
+    if (screenStream) return;
+    try{
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video:{ frameRate:24 },
+        audio:true // tab/system audio where supported
+      });
+
+      // local preview tile
+      const selfShare = ensureShareTile('self', `${displayName} — Screen`);
+      const v = selfShare.querySelector('video');
+      if (v){ v.srcObject = screenStream; v.muted = true; v.play().catch(()=>{}); }
+
+      // send to all peers
+      const vTrack = screenStream.getVideoTracks()[0];
+      if (vTrack){
+        for (const [pid, pc] of peers.entries()){
+          const sender = pc.addTrack(vTrack, screenStream);
+          screenSenders.set(pid, sender);
+        }
+        vTrack.onended = stopPresent; // user clicked "Stop sharing" in browser UI
+      }
+
+      await renegotiateAll();
+
+      // UI
+      presentBtn.setAttribute('aria-pressed','true');
+      presentBtn.textContent = 'Stop Presenting';
+      presentBtn.classList.add('bg-blue-700'); presentBtn.classList.remove('bg-slate-800');
+      show('Presenting your screen');
+    }catch(e){
+      screenStream = null;
+      await logDiag('getDisplayMedia failed', e.name||e.message);
+      show('Screen share cancelled');
+    }
+  }
+
+  async function stopPresent(){
+    if (!screenStream) return;
+    try{
+      // remove senders from each peer
+      for (const [pid, pc] of peers.entries()){
+        const sender = screenSenders.get(pid);
+        if (sender){ try{ pc.removeTrack(sender); }catch{} screenSenders.delete(pid); }
+      }
+      // stop tracks & remove preview
+      screenStream.getTracks().forEach(t=>t.stop());
+      screenStream = null;
+      removeShareTile('self');
+
+      await renegotiateAll();
+    }finally{
+      presentBtn.setAttribute('aria-pressed','false');
+      presentBtn.textContent = 'Present';
+      presentBtn.classList.remove('bg-blue-700'); presentBtn.classList.add('bg-slate-800');
+      show('Presentation ended');
+    }
+  }
+
+  // ---------- Signaling handler ----------
+  async function handleSignal(m){
+    if (m.t==='hello'){
+      ensureTile(m.from);
+      labelPeer(m.from, m.name||m.from);
+      peerNames.set(m.from, m.name||m.from);           // NEW: remember names for screen labels
+      if (myId > m.from) await makeOffer(m.from);      // deterministic offerer
+      send({t:'meta', name:displayName});
+      refreshStatus();
+    } else if (m.t==='meta'){
+      ensureTile(m.from);
+      labelPeer(m.from, m.name||m.from);
+      peerNames.set(m.from, m.name||m.from);           // NEW
+      refreshStatus();
+    } else if (m.t==='offer' && m.to===myId){
+      await makeAnswer(m.from, m.s);
+    } else if (m.t==='answer' && m.to===myId){
+      const pc = peers.get(m.from) || createPC(m.from);
+      await pc.setRemoteDescription(m.s);
+    } else if (m.t==='ice' && m.to===myId){
+      const pc = peers.get(m.from) || createPC(m.from);
+      if (m.c) { try{ await pc.addIceCandidate(m.c); }catch{} }
+    } else if (m.t==='bye'){
+      removePeer(m.from);
+    }
+  }
+
+  // ---------- Devices ----------
+  async function populateDevices(){
+    try{
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const mics = devs.filter(d=>d.kind==='audioinput');
+      const spks = devs.filter(d=>d.kind==='audiooutput');
+      micSelect.innerHTML = mics.length
+        ? mics.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Microphone')}</option>`).join('')
+        : `<option value="">No microphones</option>`;
+      spkSelect.innerHTML = `<option value="">Default speaker</option>` + spks.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Speaker')}</option>`).join('');
+      if (currentMicId && mics.some(d=>d.deviceId===currentMicId)) micSelect.value = currentMicId;
+    }catch(e){ await logDiag('enumerateDevices failed', e.name||e.message); }
+  }
+
+  async function startMic(deviceId){
+    if (!isSecure){ statusEl.textContent='Use http://localhost or https (mic blocked on file://)'; return null; }
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: deviceId?{exact:deviceId}:undefined, echoCancellation:true, noiseSuppression:true, autoGainControl:true },
+        video:false
+      });
+      await logDiag('getUserMedia ok', `tracks=${stream.getAudioTracks().length}`);
+      return stream;
+    }catch(e){
+      await logDiag('getUserMedia error', `${e.name}: ${e.message}`);
+      if (deviceId){
+        try{
+          const fb = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+          await logDiag('fallback ok', '');
+          return fb;
+        }catch(e2){ await logDiag('fallback failed', `${e2.name}: ${e2.message}`); }
+      }
+      return null;
+    }
+  }
+
+  async function attachMicStream(stream){
+    if (localStream) localStream.getTracks().forEach(t=>t.stop());
+    localStream = stream;
+    const track = localStream?.getAudioTracks?.()[0];
+    const enabled = !!(track && track.enabled!==false);
+    micOn.classList.toggle('hidden', !enabled);
+    micOff.classList.toggle('hidden', enabled);
+
+    peers.forEach(pc=>{
+      const senders = pc.getSenders().filter(s=>s.track && s.track.kind==='audio');
+      if (senders.length===0 && stream){
+        stream.getTracks().forEach(t=>pc.addTrack(t, stream));
+      } else {
+        senders.forEach(s=>s.replaceTrack(stream ? stream.getAudioTracks()[0] : null));
+      }
+    });
+    await renegotiateAll();
+  }
+
+  // ---------- Self monitor ----------
+  function isMonitorOn(){ return monitorBtn.getAttribute('aria-pressed')==='true'; }
+  function stopMonitor(){
+    if (!isMonitorOn()) return;
+    try{ monitorSource?.disconnect(); monitorGainNode?.disconnect(); monitorCtx?.close(); }catch{}
+    monitorCtx = monitorGainNode = monitorSource = null;
+    monitorBtn.setAttribute('aria-pressed','false'); monitorBtn.textContent='Monitor: Off';
+    monitorBtn.classList.remove('bg-blue-700'); monitorBtn.classList.add('bg-slate-800');
+  }
+  async function startMonitor(){
+    if (isMonitorOn() || !localStream){ if(!localStream) show('Mic not available'); return; }
+    try{
+      monitorCtx = new (window.AudioContext||window.webkitAudioContext)();
+      monitorSource = monitorCtx.createMediaStreamSource(localStream);
+      monitorGainNode = monitorCtx.createGain();
+      monitorGainNode.gain.value = (parseInt(monitorGain.value,10)||35)/100;
+      monitorSource.connect(monitorGainNode).connect(monitorCtx.destination);
+      monitorBtn.setAttribute('aria-pressed','true'); monitorBtn.textContent='Monitor: On';
+      monitorBtn.classList.add('bg-blue-700'); monitorBtn.classList.remove('bg-slate-800');
+    }catch(e){ await logDiag('monitor failed', e.name||e.message); }
+  }
+
+  // ---------- Controls ----------
+  micBtn.onclick = ()=>{
+    const track = localStream?.getAudioTracks?.()[0];
+    if (!track){ show('Mic not available'); return; }
+    track.enabled = !track.enabled;
+    micOn.classList.toggle('hidden', !track.enabled);
+    micOff.classList.toggle('hidden', track.enabled);
+    micBtn.setAttribute('aria-pressed', String(!track.enabled));
+    micBtn.classList.toggle('bg-red-700', !track.enabled);
+    micBtn.classList.toggle('hover:bg-red-600', !track.enabled);
+    micBtn.classList.toggle('bg-slate-800', track.enabled);
+    micBtn.classList.toggle('hover:bg-slate-700', track.enabled);
+    show(track.enabled ? 'Unmuted' : 'Muted');
+  };
+  let deafened = false;
+  deafenBtn.onclick = ()=>{
+    deafened = !deafened;
+    document.querySelectorAll('[data-peer] audio').forEach(a=>a.muted = deafened);
+    document.getElementById('deafenOn').classList.toggle('hidden', deafened);
+    document.getElementById('deafenOff').classList.toggle('hidden', !deafened);
+    deafenBtn.setAttribute('aria-pressed', String(deafened));
+    deafenBtn.classList.toggle('bg-yellow-700', deafened);
+    deafenBtn.classList.toggle('hover:bg-yellow-600', deafened);
+    deafenBtn.classList.toggle('bg-slate-800', !deafened);
+    deafenBtn.classList.toggle('hover:bg-slate-700', !deafened);
+    document.querySelectorAll('audio,video').forEach(a=>a.play().catch(()=>{}));
+  };
+  monitorBtn.onclick = ()=>{ if (isMonitorOn()) stopMonitor(); else startMonitor(); };
+  monitorGain.oninput = ()=>{ if (monitorGainNode) monitorGainNode.gain.value=(parseInt(monitorGain.value,10)||0)/100; };
+  speakerTestBtn.onclick = async ()=>{
+    try{ const ctx=new(window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain();
+      o.type='sine'; o.frequency.value=880; g.gain.value=.06; o.connect(g).connect(ctx.destination); o.start(); setTimeout(()=>{o.stop(); ctx.close();}, 350);
+    }catch{ show('Speaker test failed'); }
+  };
+  presentBtn.onclick = async ()=>{  // NEW
+    if (presentBtn.getAttribute('aria-pressed')==='true') await stopPresent();
+    else await startPresent();
+  };
+  leaveBtn.onclick = ()=>{ send({t:'bye'}); peers.forEach(pc=>{try{pc.close();}catch{}}); peers.clear(); stopPresent(); location.reload(); };
+
+  // ---------- Join flow ----------
+  function addSelfTile(){
+    const you = document.createElement('div');
+    you.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
+    you.innerHTML = `
+      <div class="talk-ring"><div class="talk-dot" data-dot-self></div></div>
+      <div class="absolute inset-0 grid place-items-center pointer-events-none">
+        <div class="w-16 h-16 rounded-full bg-blue-500/80 ring-2 ring-white/30 text-white grid place-items-center text-2xl font-semibold" data-initial>${escapeHtml(displayName.charAt(0).toUpperCase())}</div>
+      </div>
+      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60">${escapeHtml(displayName)} (you)</div>`;
+    grid.prepend(you); updateLayout();
+  }
+  function startSelfVAD(){
+    const dot = document.querySelector('[data-dot-self]'); if (!dot || !localStream) return;
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(localStream);
+      const an = ctx.createAnalyser(); an.fftSize=2048; src.connect(an);
+      const data = new Uint8Array(an.fftSize);
+      let raf=0; const loop=()=>{
+        an.getByteTimeDomainData(data);
+        let sum=0; for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; sum+=v*v; }
+        const rms=Math.sqrt(sum/data.length);
+        const scale=0.9+Math.min(1.5, rms*6);
+        dot.style.transform=`scale(${scale.toFixed(3)})`;
+        dot.style.boxShadow=`0 0 ${Math.max(.5, rms*12).toFixed(2)}rem rgba(59,130,246,.85)`;
+        raf=requestAnimationFrame(loop);
+      }; loop();
+      window.addEventListener('beforeunload',()=>{ try{ cancelAnimationFrame(raf); ctx.close(); }catch{} });
+    }catch{}
+  }
+
+  async function populateAndStartMic(){
+    await populateDevices();
+    const stream = await startMic(micSelect.value || undefined);
+    if (stream){
+      currentMicId = stream.getAudioTracks()[0]?.getSettings()?.deviceId || null;
+      await attachMicStream(stream);
+      startSelfVAD();
+      await startMonitor(); // self monitor ON by default
+      micOn.classList.remove('hidden'); micOff.classList.add('hidden');
+      show('Mic ready');
+    } else {
+      show('Mic blocked or not found');
+      statusEl.textContent = 'Mic unavailable — you can still hear others';
+    }
+  }
+
+  async function beginJoin(){
+    if (location.protocol === 'file:'){
+      alert('Open this file via http://localhost or https:// — tab discovery and mic fail on file://');
+    }
+    displayName = (nameInput.value||'').trim() || 'Guest';
+    localStorage.setItem('displayName', displayName);
+    joinOverlay.classList.add('hidden');
+    addSelfTile();
+
+    await populateAndStartMic();
+    await unlockAudio();
+
+    // announce presence repeatedly (fix missed-hello)
+    const burst = ()=>{ for(let i=0;i<3;i++) setTimeout(()=>{ send({t:'hello', name:displayName}); send({t:'meta', name:displayName}); }, i*120); };
+    burst();
+    const helloInt = setInterval(()=>{ send({t:'hello', name:displayName}); }, 2000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) burst(); });
+
+    // If peers already exist, offer now
+    setTimeout(()=>{ for(const id of peers.keys()){ makeOffer(id).catch(()=>{}); } }, 200);
+    refreshStatus();
+
+    // clean up
+    window.addEventListener('beforeunload', ()=>{ clearInterval(helloInt); send({t:'bye'}); stopMonitor(); stopPresent(); });
+  }
+
+  joinBtn.onclick = beginJoin;
+  nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') beginJoin(); });
+
+  // ---------- Device actions ----------
+  micSelect.onchange = async ()=>{
+    const stream = await startMic(micSelect.value || undefined);
+    if (stream){ currentMicId = stream.getAudioTracks()[0]?.getSettings()?.deviceId || null; await attachMicStream(stream); startSelfVAD(); if (isMonitorOn()) { stopMonitor(); startMonitor(); } show('Mic switched'); }
+    else show('Mic switch failed');
+  };
+  spkSelect.onchange = async ()=>{
+    const sink = spkSelect.value||''; const audios = Array.from(document.querySelectorAll('audio'));
+    for (const a of audios){ if (typeof a.setSinkId==='function') { try{ await a.setSinkId(sink); }catch(e){ await logDiag('setSinkId failed', e.name||e.message); } } }
+    show('Speaker changed');
+  };
+  micRetest.onclick = async ()=>{ await populateAndStartMic(); };
+
+  // Discovery ping even before join
+  setTimeout(()=>{ send({t:'hello', name:'(not joined yet)'}); }, 300);
+
+  statusEl.textContent = 'Ready — pick a name';
+})();
+</script>
 </body>
 </html>
