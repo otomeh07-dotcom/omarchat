@@ -3,31 +3,23 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Global Meet — Smooth Viz + Dedup Chat (Vercel)</title>
+<title>Global Meet — One-File (Chat • Present • Pro Viz)</title>
+<meta name="color-scheme" content="dark"/>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   :root{color-scheme:dark}
   .tile{aspect-ratio:16/9}
-  details>summary{cursor:pointer}
-  .kbd{border:1px solid #334;padding:.05rem .35rem;border-radius:.375rem;background:#0b1220;font-size:.8em}
-
-  /* Tile enter */
-  .tile-enter{opacity:0; transform:scale(.98)}
+  .tile-enter{opacity:0; transform:scale(.985)}
   .tile-enter-active{opacity:1; transform:scale(1); transition:opacity 220ms ease, transform 220ms ease}
   .tile:hover{box-shadow:0 10px 30px rgba(0,0,0,.35)}
-
-  /* Avatar + ring equalizer */
   .avatar-wrap{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
   .avatar{width:4.25rem; height:4.25rem; border-radius:9999px; background:linear-gradient(135deg,#60a5fa,#4f46e5); color:white;
           display:grid; place-items:center; font-size:1.75rem; font-weight:700; box-shadow:0 0 0 2px rgba(255,255,255,.25)}
-  .viz{position:absolute; width:8.5rem; height:8.5rem; pointer-events:none; filter:drop-shadow(0 4px 10px rgba(59,130,246,.25))}
-  .viz .bar{transform-origin:50% 50%; transition:opacity 160ms linear}
-  .viz .bar line{stroke:#60a5fa; stroke-linecap:round; }
-
-  /* Chat panel */
+  .viz-canvas{position:absolute; width:11rem; height:11rem; pointer-events:none; filter:drop-shadow(0 10px 22px rgba(59,130,246,.28))}
   .chat-panel{width:22rem; max-width:90vw}
   .msg-enter{opacity:0; transform:translateY(6px)}
   .msg-enter-active{opacity:1; transform:none; transition:opacity 160ms ease, transform 160ms ease}
+  .kbd{border:1px solid #334;padding:.05rem .35rem;border-radius:.375rem;background:#0b1220;font-size:.8em}
 </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
@@ -118,7 +110,7 @@
       <input id="nameInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Your name"/>
       <button id="joinBtn" class="px-4 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500">Join</button>
     </div>
-    <p class="mt-2 text-xs text-slate-500">HTTPS is required (Vercel provides it). If no mic prompt: click site lock icon → allow Microphone → press <span class="kbd">Retest</span>.</p>
+    <p class="mt-2 text-xs text-slate-500">HTTPS is required (Vercel provides it). If no mic prompt: site lock icon → allow Microphone → press <span class="kbd">Retest</span>.</p>
   </div>
 </div>
 
@@ -140,7 +132,6 @@
   const presentBtn = document.getElementById('presentBtn');
   const speakerTestBtn = document.getElementById('speakerTest');
   const leaveBtn = document.getElementById('leaveBtn');
-
   const chatPanel = document.getElementById('chatPanel');
   const chatToggle = document.getElementById('chatToggle');
   const chatClose = document.getElementById('chatClose');
@@ -148,7 +139,6 @@
   const chatInput = document.getElementById('chatInput');
   const chatSend = document.getElementById('chatSend');
   const chatBadge = document.getElementById('chatBadge');
-
   const joinOverlay = document.getElementById('joinOverlay');
   const nameInput = document.getElementById('nameInput');
   const joinBtn = document.getElementById('joinBtn');
@@ -172,16 +162,16 @@
   // ===== State =====
   nameInput.value = localStorage.getItem('displayName') || '';
   let displayName = '';
-  let localStream = null;       // raw mic
-  let sendStream = null;        // processed mic (gain+comp) sent to peers
-  let sendGainNode = null, sendCtx = null;
+  let localStream = null; // raw mic
+  let sendStream = null;  // boosted + compressed
+  let sendCtx = null, sendGainNode = null;
   let monitorCtx = null, monitorGainNode = null, monitorSource = null;
 
   let screenStream = null;
   const screenSenders = new Map();
   const peerNames = new Map();
 
-  // ===== Signaling (BroadcastChannel + localStorage) with de-dup IDs =====
+  // ===== Signaling (BroadcastChannel + localStorage) with de-dup =====
   const bc = (typeof BroadcastChannel!=='undefined') ? new BroadcastChannel('global-meet-local') : null;
   const LS_KEY = 'gmeet-signal';
   const myId = (crypto && crypto.randomUUID) ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10);
@@ -196,115 +186,130 @@
     msg.url = SAME_URL_KEY;
     msg.from = myId;
     msg.id = msg.id || makeId();
-    markSeen(msg.id); // prevent local echo duplicates
+    markSeen(msg.id);
     try{ bc && bc.postMessage(msg); }catch{}
     try{ localStorage.setItem(LS_KEY, JSON.stringify(msg)+'::'+Math.random()); }catch{}
   }
   function onSignal(msg){
     if (!msg || msg.url !== SAME_URL_KEY) return;
     if (msg.from === myId) return;
-    if (!shouldAccept(msg)) return;  // <-- dedupe across transports
+    if (!shouldAccept(msg)) return;
     handleSignal(msg);
   }
   bc && (bc.onmessage = (e)=>onSignal(e.data));
   window.addEventListener('storage', (e)=>{
     if (e.key !== LS_KEY || !e.newValue) return;
-    try{ const raw = e.newValue.split('::')[0]; const m = JSON.parse(raw); onSignal(m); }catch{}
+    try{ const raw = e.newValue.split('::')[0]; onSignal(JSON.parse(raw)); }catch{}
   });
 
-  // ===== Tiles & Smooth Visualizer =====
-  function enterAnimate(el){ el.classList.add('tile-enter'); requestAnimationFrame(()=>{ el.classList.add('tile-enter-active'); el.classList.remove('tile-enter'); setTimeout(()=>el.classList.remove('tile-enter-active'),240); }); }
-
-  function makeVizSVG(){
-    // 24 radial bars around 42px radius, bars grow outward 10..38px
-    const N = 24, R = 34, MAX = 38, MIN = 10;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('class','viz');
-    svg.setAttribute('viewBox','0 0 120 120'); // center at 60,60
-    for (let i=0;i<N;i++){
-      const g = document.createElementNS(svg.namespaceURI,'g');
-      g.setAttribute('class','bar');
-      g.setAttribute('transform',`rotate(${(360/N)*i} 60 60)`);
-      const line = document.createElementNS(svg.namespaceURI,'line');
-      line.setAttribute('x1','60'); line.setAttribute('y1', String(60 - R));
-      line.setAttribute('x2','60'); line.setAttribute('y2', String(60 - (R + MIN)));
-      line.setAttribute('stroke-width','4.5');
-      g.appendChild(line);
-      svg.appendChild(g);
-    }
-    return {svg, N, R, MIN, MAX};
+  // ===== Canvas Visualizer (springy radial bars with glow + hue shift) =====
+  const vis = new Map(); // key -> {ctx, analyser, raf, cvs, ema[], vel[], ranges}
+  function createCanvas(size=240){
+    const cvs = document.createElement('canvas');
+    cvs.width = size; cvs.height = size;
+    cvs.className = 'viz-canvas';
+    return cvs;
   }
-
-  const peerVis = new Map(); // id -> {ctx, analyser, data, ema[], raf, bars[]}
-
-  function attachVisualizer(id, mediaStream, self=false){
-    detachVisualizer(id);
+  function attachVisualizer(key, mediaStream, mountEl){
+    detachVisualizer(key);
     try{
-      const tile = self ? document.querySelector('[data-self="1"]') : document.querySelector(`[data-peer="${id}"]`);
-      if (!tile) return;
-      const wrap = tile.querySelector('.avatar-wrap');
-      const {svg, N, R, MIN, MAX} = makeVizSVG();
-      wrap.appendChild(svg);
-
-      const ctx = new (window.AudioContext||window.webkitAudioContext)();
-      const src = ctx.createMediaStreamSource(mediaStream);
-      const an = ctx.createAnalyser();
-      an.fftSize = 2048; an.smoothingTimeConstant = 0.78; // extra smooth
+      const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = audioCtx.createMediaStreamSource(mediaStream);
+      const an = audioCtx.createAnalyser();
+      an.fftSize = 2048; an.smoothingTimeConstant = 0.76;
       src.connect(an);
       const data = new Uint8Array(an.frequencyBinCount);
-      const bars = Array.from(svg.querySelectorAll('.bar line'));
-      const ema = new Array(N).fill(0);
 
-      // precompute frequency bin ranges for N bars (log-ish mapping)
-      const sampleRate = ctx.sampleRate || 48000;
+      const cvs = createCanvas();
+      mountEl.appendChild(cvs);
+      const cx = cvs.getContext('2d');
+
+      const N = 48;                      // radial bars
+      const ema = new Array(N).fill(0);
+      const vel = new Array(N).fill(0);
+      const k = 0.22, d = 0.18;          // spring stiffness/damping
+      const baseR = 62, minH = 12, maxH = 50;
+      let hue = 210;
+
+      // log frequency mapping
+      const sampleRate = audioCtx.sampleRate || 48000;
       const maxFreq = sampleRate/2;
-      const bins = [];
+      const ranges = [];
       for (let i=0;i<N;i++){
-        const f1 = 60 * Math.pow(maxFreq/60, i/N);        // 60Hz .. Nyquist
-        const f2 = 60 * Math.pow(maxFreq/60, (i+1)/N);
-        const bin1 = Math.max(1, Math.floor(f1/maxFreq * data.length));
-        const bin2 = Math.min(data.length-1, Math.ceil(f2/maxFreq * data.length));
-        bins.push([bin1, bin2]);
+        const f1 = 60*Math.pow(maxFreq/60, i/N);
+        const f2 = 60*Math.pow(maxFreq/60, (i+1)/N);
+        const b1 = Math.max(1, Math.floor(f1/maxFreq*data.length));
+        const b2 = Math.min(data.length-1, Math.ceil(f2/maxFreq*data.length));
+        ranges.push([b1,b2]);
       }
 
-      let raf=0;
-      const loop = ()=>{
+      function draw(){
         an.getByteFrequencyData(data);
+        // compute smoothed targets
+        let energy = 0;
+        const tgt = new Array(N).fill(0);
         for (let i=0;i<N;i++){
-          const [b1,b2] = bins[i];
-          let sum=0, c=0;
-          for (let b=b1;b<=b2;b++){ sum += data[b]; c++; }
-          const avg = c? (sum/c)/255 : 0;             // 0..1
-          // EMA smoothing + slight neighbor coupling for fluidity
-          const neighbor = i>0 ? ema[i-1] : ema[i];
-          ema[i] = ema[i]*0.84 + avg*0.16;
-          const val = ema[i]*0.85 + neighbor*0.15;
-
-          const len = MIN + (MAX-MIN)*Math.min(1, val*1.4);
-          const y2 = 60 - (R + len);
-          bars[i].setAttribute('y2', String(y2.toFixed(2)));
-          bars[i].style.opacity = (0.45 + val*0.55).toFixed(2);
-          bars[i].style.strokeWidth = (3.5 + val*2.0).toFixed(2);
+          const [b1,b2]=ranges[i]; let s=0,c=0;
+          for(let b=b1;b<=b2;b++){ s+=data[b]; c++; }
+          const avg = c ? (s/c)/255 : 0;
+          energy += avg;
+          tgt[i] = tgt[i]*0.0 + avg; // base (we’ll spring to this)
         }
-        raf = requestAnimationFrame(loop);
-      };
-      loop();
-      peerVis.set(self?'self':id, {ctx, analyser:an, data, ema, raf, svg});
+        energy = Math.min(1, (energy/N)*1.3);
+        hue = 200 + energy*45; // color shift with energy
+
+        // neighbor coupling then spring physics
+        const coupled = tgt.slice();
+        for (let i=0;i<N;i++){
+          const n1 = (i>0?tgt[i-1]:tgt[i]);
+          const n2 = (i<N-1?tgt[i+1]:tgt[i]);
+          coupled[i] = tgt[i]*0.78 + (n1+n2)*0.11;
+        }
+        for (let i=0;i<N;i++){
+          const a = k*(coupled[i] - ema[i]) - d*vel[i];
+          vel[i] += a;
+          ema[i] += vel[i];
+          if (ema[i]<0) ema[i]=0;
+        }
+
+        // draw radial bars with glow
+        cx.clearRect(0,0,cvs.width,cvs.height);
+        cx.save();
+        cx.translate(cvs.width/2, cvs.height/2);
+        cx.lineCap = 'round';
+        const radius = baseR;
+        const bars = N;
+        cx.shadowBlur = 18;
+        cx.shadowColor = `hsla(${hue}, 95%, 65%, .55)`;
+        for (let i=0;i<bars;i++){
+          const ang = (i/bars) * Math.PI*2;
+          const val = Math.min(1, ema[i]*1.4);
+          const h = minH + (maxH-minH)*val;
+          const x1 = Math.cos(ang)*radius;
+          const y1 = Math.sin(ang)*radius;
+          const x2 = Math.cos(ang)*(radius + h);
+          const y2 = Math.sin(ang)*(radius + h);
+          cx.strokeStyle = `hsla(${hue + i*0.6}, 85%, ${55 + val*25}%, ${0.55 + val*0.35})`;
+          cx.lineWidth = 3.5 + val*2.2;
+          cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+        }
+        cx.restore();
+        raf = requestAnimationFrame(draw);
+      }
+      let raf = requestAnimationFrame(draw);
+      vis.set(key, {ctx:audioCtx, analyser:an, raf, cvs, ema, vel, ranges});
     }catch{}
   }
-
-  function detachVisualizer(id){
-    const key = (id==='self')?'self':id;
-    const v = peerVis.get(key); if (!v) return;
+  function detachVisualizer(key){
+    const v = vis.get(key); if (!v) return;
     try{ cancelAnimationFrame(v.raf); }catch{}
     try{ v.ctx.close(); }catch{}
-    try{ v.svg.remove(); }catch{}
-    peerVis.delete(key);
+    try{ v.cvs.remove(); }catch{}
+    vis.delete(key);
   }
 
-  // ----- Tile creation -----
+  // ===== Tiles =====
   function enterAnimateTile(el){ el.classList.add('tile-enter'); requestAnimationFrame(()=>{ el.classList.add('tile-enter-active'); el.classList.remove('tile-enter'); setTimeout(()=>el.classList.remove('tile-enter-active'),240); }); }
-
   function ensureTile(id){
     let el = document.querySelector(`[data-peer="${id}"]`);
     if (el) return el;
@@ -313,14 +318,11 @@
     el.dataset.peer = id;
     el.innerHTML = `
       <audio autoplay playsinline></audio>
-      <div class="avatar-wrap">
-        <div class="avatar" data-initial>?</div>
-      </div>
+      <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
       <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>${id.slice(0,6)}</div>`;
     grid.append(el); enterAnimateTile(el); updateLayout();
     return el;
   }
-
   function ensureSelfTile(){
     let el = document.querySelector('[data-self="1"]');
     if (el) return el;
@@ -328,19 +330,16 @@
     el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
     el.setAttribute('data-self','1');
     el.innerHTML = `
-      <div class="avatar-wrap">
-        <div class="avatar" data-initial>?</div>
-      </div>
+      <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
       <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>(you)</div>`;
     grid.prepend(el); enterAnimateTile(el); updateLayout();
     return el;
   }
-
   function ensureShareTile(ownerId, labelText){
     let el = document.querySelector(`[data-share="${ownerId}"]`);
     if (el) return el;
     el = document.createElement('div');
-    el.className = 'tile relative rounded-xl overflow-hidden bg-slate-800';
+    el.className = 'tile relative rounded-xl overflow-hidden bg-black';
     el.dataset.share = ownerId;
     el.innerHTML = `
       <video autoplay playsinline muted class="w-full h-full object-contain bg-black"></video>
@@ -349,7 +348,6 @@
     return el;
   }
   function removeShareTile(ownerId){ const el = document.querySelector(`[data-share="${ownerId}"]`); if (el) el.remove(); updateLayout(); }
-
   function labelPeer(id, name){
     const el = document.querySelector(`[data-peer="${id}"] [data-label]`); if (el) el.textContent = name;
     const badge = document.querySelector(`[data-peer="${id}"] [data-initial]`); if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase();
@@ -358,8 +356,6 @@
     const el = document.querySelector('[data-self="1"] [data-label]'); if (el) el.textContent = `${escapeHtml(name)} (you)`;
     const badge = document.querySelector('[data-self="1"] [data-initial]'); if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase();
   }
-
-  // ===== VAD wires are handled by attachVisualizer() per stream =====
 
   // ===== WebRTC =====
   function createPC(id){
@@ -385,7 +381,8 @@
           a.play().catch(()=>{});
           const sink = spkSelect.value; if (sink && typeof a.setSinkId==='function') a.setSinkId(sink).catch(()=>{});
         }
-        attachVisualizer(id, stream, false);
+        const mount = el.querySelector('.avatar-wrap');
+        attachVisualizer(id, stream, mount);
       }
       if (track.kind === 'video'){
         const label = `${peerNames.get(id) || id.slice(0,6)} — Screen`;
@@ -424,7 +421,7 @@
     refreshStatus();
   }
 
-  // ===== Devices & Mic (LOUDER chain) =====
+  // ===== Mic: enumerate + boosted send chain =====
   async function populateDevices(){
     try{
       const devs = await navigator.mediaDevices.enumerateDevices();
@@ -448,10 +445,10 @@
     if (sendCtx) { try{ sendCtx.close(); }catch{} sendCtx=null; }
     sendCtx = new (window.AudioContext||window.webkitAudioContext)();
     const src = sendCtx.createMediaStreamSource(fromStream);
-    const gain = sendCtx.createGain(); gain.gain.value = 1.6; // louder to others
+    const gain = sendCtx.createGain(); gain.gain.value = 1.65; // louder to others
     sendGainNode = gain;
     const comp = sendCtx.createDynamicsCompressor();
-    comp.threshold.value = -24; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.003; comp.release.value = 0.25;
+    comp.threshold.value = -24; comp.knee.value = 20; comp.ratio.value = 3.2; comp.attack.value = 0.003; comp.release.value = 0.25;
     const dest = sendCtx.createMediaStreamDestination();
     src.connect(gain).connect(comp).connect(dest);
     sendStream = dest.stream;
@@ -461,18 +458,16 @@
     localStream = stream;
     await buildSendChain(localStream);
 
-    // update self tile + visualizer
-    ensureSelfTile();
-    labelSelf(displayName);
+    ensureSelfTile(); labelSelf(displayName);
+    const mount = document.querySelector('[data-self="1"] .avatar-wrap');
     detachVisualizer('self');
-    attachVisualizer('self', localStream, true);
+    attachVisualizer('self', localStream, mount);
 
     const track = localStream?.getAudioTracks?.()[0];
     const enabled = !!(track && track.enabled!==false);
     micOn.classList.toggle('hidden', !enabled);
     micOff.classList.toggle('hidden', enabled);
 
-    // replace tracks to peers with processed sendStream
     peers.forEach(pc=>{
       const senders = pc.getSenders().filter(s=>s.track && s.track.kind==='audio');
       if (senders.length===0 && sendStream){
@@ -484,7 +479,7 @@
     await renegotiateAll();
   }
 
-  // ===== Monitor (hear yourself) =====
+  // ===== Self monitor =====
   function isMonitorOn(){ return monitorBtn.getAttribute('aria-pressed')==='true'; }
   function stopMonitor(){
     if (!isMonitorOn()) return;
@@ -546,7 +541,7 @@
     }
   }
 
-  // ===== Chat (dedup aware) =====
+  // ===== Chat (dedup — messages show once) =====
   let unread = 0, chatOpen = false;
   function setUnread(n){ unread=Math.max(0,n); chatBadge.textContent=String(unread); chatBadge.classList.toggle('hidden',unread===0); }
   function openChat(){ chatPanel.classList.remove('hidden'); chatOpen=true; setUnread(0); chatInput.focus(); }
@@ -567,10 +562,8 @@
   }
   function sendChat(){
     const txt = (chatInput.value||'').trim(); if (!txt) return;
-    // Show locally once
-    pushMsg(displayName, txt, true);
-    // Send with unique id (dedup guarantees others see once, you won't loop)
-    send({t:'chat', name:displayName, text:txt, id:makeId()});
+    pushMsg(displayName, txt, true);               // show once locally
+    send({t:'chat', name:displayName, text:txt, id:makeId()}); // send with ID -> dedup
     chatInput.value='';
   }
 
@@ -600,7 +593,6 @@
     } else if (m.t==='bye'){
       removePeer(m.from);
     } else if (m.t==='chat'){
-      // Show once (dedup already handled at transport level)
       pushMsg(m.name||m.from, m.text||'');
     }
   }
