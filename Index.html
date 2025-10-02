@@ -1,683 +1,649 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Global Meet — One-File (Chat • Present • Pro Viz)</title>
-<meta name="color-scheme" content="dark"/>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  :root{color-scheme:dark}
-  .tile{aspect-ratio:16/9}
-  .tile-enter{opacity:0; transform:scale(.985)}
-  .tile-enter-active{opacity:1; transform:scale(1); transition:opacity 220ms ease, transform 220ms ease}
-  .tile:hover{box-shadow:0 10px 30px rgba(0,0,0,.35)}
-  .avatar-wrap{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
-  .avatar{width:4.25rem; height:4.25rem; border-radius:9999px; background:linear-gradient(135deg,#60a5fa,#4f46e5); color:white;
-          display:grid; place-items:center; font-size:1.75rem; font-weight:700; box-shadow:0 0 0 2px rgba(255,255,255,.25)}
-  .viz-canvas{position:absolute; width:11rem; height:11rem; pointer-events:none; filter:drop-shadow(0 10px 22px rgba(59,130,246,.28))}
-  .chat-panel{width:22rem; max-width:90vw}
-  .msg-enter{opacity:0; transform:translateY(6px)}
-  .msg-enter-active{opacity:1; transform:none; transition:opacity 160ms ease, transform 160ms ease}
-  .kbd{border:1px solid #334;padding:.05rem .35rem;border-radius:.375rem;background:#0b1220;font-size:.8em}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="dark"/>
+  <title>Global Meet — Single File</title>
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!--
+    Vercel must serve this *as-is* (static).
+    - Put ONLY this file in the repo root.
+    - Framework preset: Other
+    - Build command: (empty)
+    - Output directory: (empty)
+    - Root directory: repo root (don’t point to a subfolder)
+  -->
+
+  <style>
+    :root { color-scheme: dark }
+    .tile { aspect-ratio: 16/9; position: relative }
+    .tile-enter { opacity: 0; transform: scale(.985) }
+    .tile-enter-active { opacity: 1; transform: scale(1); transition: opacity 220ms ease, transform 220ms ease }
+    .avatar-wrap { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none }
+    .avatar { width:4.25rem; height:4.25rem; border-radius:9999px; background:linear-gradient(135deg,#60a5fa,#4f46e5);
+              color:#fff; display:grid; place-items:center; font-size:1.75rem; font-weight:700;
+              box-shadow:0 0 0 2px rgba(255,255,255,.25) }
+    .viz-canvas { position:absolute; width:11rem; height:11rem; pointer-events:none; filter:drop-shadow(0 10px 22px rgba(59,130,246,.28)) }
+    .msg-enter{opacity:0; transform:translateY(6px)}
+    .msg-enter-active{opacity:1; transform:none; transition:opacity 160ms ease, transform 160ms ease}
+    .kbd{border:1px solid #334;padding:.05rem .35rem;border-radius:.375rem;background:#0b1220;font-size:.8em}
+    .diag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
 
-<header class="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-slate-800 bg-slate-950/80">
-  <div class="flex items-center gap-2 min-w-[14rem]">
-    <span class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">Global Room</span>
-    <code class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">local mesh</code>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <label class="text-xs text-slate-400">Mic</label>
-    <select id="micSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
-    <button id="micRetest" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700">Retest</button>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <label class="text-xs text-slate-400">Speaker</label>
-    <select id="spkSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
-  </div>
-
-  <div class="ml-auto flex items-center gap-2">
-    <button id="chatToggle" class="relative text-xs px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700">Chat
-      <span id="chatBadge" class="hidden absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] grid place-items-center bg-blue-600">0</span>
-    </button>
-    <div class="text-sm text-slate-400" id="status">initializing…</div>
-  </div>
-</header>
-
-<main class="flex-1 min-h-0 flex">
-  <!-- Grid -->
-  <section id="grid" class="flex-1 grid gap-2 p-2" style="grid-template-columns:repeat(1,minmax(0,1fr))"></section>
-
-  <!-- Chat -->
-  <aside id="chatPanel" class="chat-panel border-l border-slate-800 bg-slate-950/60 backdrop-blur-md hidden md:flex md:flex-col">
-    <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800">
-      <div class="text-sm text-slate-300">Room chat</div>
-      <button id="chatClose" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700">Close</button>
+  <!-- Header -->
+  <header class="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-slate-800 bg-slate-950/80">
+    <div class="flex items-center gap-2 min-w-[14rem]">
+      <span class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">Global Room</span>
+      <code class="text-xs px-2 py-1 rounded-md border border-slate-700 bg-slate-900">local mesh</code>
     </div>
-    <div id="chatList" class="flex-1 px-3 py-2 overflow-auto space-y-2"></div>
-    <div class="p-3 border-t border-slate-800">
-      <div class="flex gap-2">
-        <input id="chatInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Message"/>
-        <button id="chatSend" class="px-3 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500 text-xs">Send</button>
-      </div>
-    </div>
-  </aside>
-</main>
 
-<!-- Controls -->
-<div class="flex items-center justify-center py-4 border-t border-slate-800 bg-slate-950/80">
-  <div class="flex items-center gap-3 px-3 py-2 rounded-full border border-slate-700 bg-slate-900/90 shadow-lg">
-    <button id="micBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Toggle microphone" aria-pressed="false">
-      <svg id="micOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2zM7 22h10v-2H7z"/></svg>
-      <svg id="micOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6 hidden"><path fill="currentColor" d="M19 11a7 7 0 0 1-7 7v3h-2v-3a7 7 0 0 1-6-7h2a5 5 0 0 0 10 0h2zM12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-5.12 2.1L15 7.98V6a3 3 0 0 0-3-3z"/></svg>
-    </button>
-
-    <button id="deafenBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Mute speakers" aria-pressed="false">
-      <svg id="deafenOn" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-4.5-4.5v-2A6.5 6.5 0 0 1 18.5 12h-2zM17 12a3 3 0 0 0-3-3v2a1 1 0 0 1 1 1h2z"/></svg>
-      <svg id="deafenOff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6 hidden"><path fill="currentColor" d="M3.27 2 2 3.27 7.73 9H3v6h4l5 5v-6.73l5.73 5.73L20 20.73 3.27 2zM14 3.97v2.02a6.5 6.5 0 0 1 6.5 6.5h-2A4.5 4.5 0 0 0 14 6z"/></svg>
-    </button>
-
-    <button id="monitorBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-blue-700 hover:bg-blue-600 text-xs" aria-pressed="true" title="Hear your own mic">
-      Monitor: On
-    </button>
-    <input id="monitorGain" type="range" min="0" max="100" value="40" class="w-28" title="Monitor volume">
-
-    <button id="presentBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs" aria-pressed="false" title="Share your screen">
-      Present
-    </button>
-
-    <button id="speakerTest" class="text-xs px-2 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700">Speaker test</button>
-    <button id="leaveBtn" class="w-12 h-12 rounded-full grid place-items-center bg-red-800 hover:bg-red-700" title="Leave">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-6 h-6"><path fill="currentColor" d="M5 15c3.866-3.866 10.134-3.866 14 0l3-3C16.5 6.5 7.5 6.5 2 12l3 3z"/></svg>
-    </button>
-  </div>
-</div>
-
-<!-- Toast -->
-<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-4 px-3 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm hidden"></div>
-
-<!-- Join overlay -->
-<div id="joinOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm grid place-items-center">
-  <div class="w-full max-w-md mx-auto p-6 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
-    <h2 class="text-lg font-semibold mb-2">Join Global Room</h2>
-    <p class="text-sm text-slate-400 mb-4">Choose a display name and click Join.</p>
     <div class="flex items-center gap-2">
-      <input id="nameInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Your name"/>
-      <button id="joinBtn" class="px-4 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500">Join</button>
+      <label class="text-xs text-slate-400">Mic</label>
+      <select id="micSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
+      <button id="micRetest" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700">Retest</button>
     </div>
-    <p class="mt-2 text-xs text-slate-500">HTTPS is required (Vercel provides it). If no mic prompt: site lock icon → allow Microphone → press <span class="kbd">Retest</span>.</p>
-  </div>
-</div>
 
-<script>
-(function(){
-  // ===== DOM =====
-  const grid = document.getElementById('grid');
-  const statusEl = document.getElementById('status');
-  const toast = document.getElementById('toast');
-  const micBtn = document.getElementById('micBtn');
-  const deafenBtn = document.getElementById('deafenBtn');
-  const micOn = document.getElementById('micOn');
-  const micOff = document.getElementById('micOff');
-  const micSelect = document.getElementById('micSelect');
-  const spkSelect = document.getElementById('spkSelect');
-  const micRetest = document.getElementById('micRetest');
-  const monitorBtn = document.getElementById('monitorBtn');
-  const monitorGain = document.getElementById('monitorGain');
-  const presentBtn = document.getElementById('presentBtn');
-  const speakerTestBtn = document.getElementById('speakerTest');
-  const leaveBtn = document.getElementById('leaveBtn');
-  const chatPanel = document.getElementById('chatPanel');
-  const chatToggle = document.getElementById('chatToggle');
-  const chatClose = document.getElementById('chatClose');
-  const chatList = document.getElementById('chatList');
-  const chatInput = document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-  const chatBadge = document.getElementById('chatBadge');
-  const joinOverlay = document.getElementById('joinOverlay');
-  const nameInput = document.getElementById('nameInput');
-  const joinBtn = document.getElementById('joinBtn');
+    <div class="flex items-center gap-2">
+      <label class="text-xs text-slate-400">Speaker</label>
+      <select id="spkSelect" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 min-w-[12rem]"></select>
+    </div>
 
-  // ===== Helpers =====
-  const isSecure = (window.isSecureContext || /^https?:\/\//i.test(location.href));
-  const SAME_URL_KEY = location.origin + location.pathname;
-  function show(t){ toast.textContent=t; toast.classList.remove('hidden'); clearTimeout(show._t); show._t=setTimeout(()=>toast.classList.add('hidden'),1400); }
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-  function updateLayout(){
-    const n = document.querySelectorAll('#grid .tile').length;
-    let cols=1; if(n===1)cols=1; else if(n===2)cols=2; else if(n<=4)cols=2; else if(n<=6)cols=3; else if(n<=9)cols=3; else cols=4;
-    grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
-  }
-  function refreshStatus(){ statusEl.textContent = `Online • ${peers.size} peer${peers.size===1?'':'s'}`; }
-  async function unlockAudio(){
-    document.querySelectorAll('audio,video').forEach(a=>{ try{ a.play(); }catch{} });
-    try{ const ctx=new(window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') await ctx.resume(); ctx.close(); }catch{}
-  }
+    <div class="ml-auto flex items-center gap-2">
+      <button id="chatToggle" class="relative text-xs px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700">
+        Chat <span id="chatBadge" class="hidden absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] grid place-items-center bg-blue-600">0</span>
+      </button>
+      <div class="text-sm text-slate-400" id="status">initializing…</div>
+    </div>
+  </header>
 
-  // ===== State =====
-  nameInput.value = localStorage.getItem('displayName') || '';
-  let displayName = '';
-  let localStream = null; // raw mic
-  let sendStream = null;  // boosted + compressed
-  let sendCtx = null, sendGainNode = null;
-  let monitorCtx = null, monitorGainNode = null, monitorSource = null;
+  <!-- Main -->
+  <main class="flex-1 min-h-0 flex">
+    <!-- Peers grid -->
+    <section id="grid" class="flex-1 grid gap-2 p-2" style="grid-template-columns:repeat(1,minmax(0,1fr))"></section>
 
-  let screenStream = null;
-  const screenSenders = new Map();
-  const peerNames = new Map();
-
-  // ===== Signaling (BroadcastChannel + localStorage) with de-dup =====
-  const bc = (typeof BroadcastChannel!=='undefined') ? new BroadcastChannel('global-meet-local') : null;
-  const LS_KEY = 'gmeet-signal';
-  const myId = (crypto && crypto.randomUUID) ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10);
-  const peers = new Map();
-  const iceConfig = { iceServers:[{urls:'stun:stun.l.google.com:19302'}] };
-  const seenIds = new Set();
-  function makeId(){ return `${myId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2,7)}`; }
-  function markSeen(id){ seenIds.add(id); setTimeout(()=>seenIds.delete(id), 60000); }
-  function shouldAccept(m){ if (!m || !m.id) return true; if (seenIds.has(m.id)) return false; markSeen(m.id); return true; }
-
-  function send(msg){
-    msg.url = SAME_URL_KEY;
-    msg.from = myId;
-    msg.id = msg.id || makeId();
-    markSeen(msg.id);
-    try{ bc && bc.postMessage(msg); }catch{}
-    try{ localStorage.setItem(LS_KEY, JSON.stringify(msg)+'::'+Math.random()); }catch{}
-  }
-  function onSignal(msg){
-    if (!msg || msg.url !== SAME_URL_KEY) return;
-    if (msg.from === myId) return;
-    if (!shouldAccept(msg)) return;
-    handleSignal(msg);
-  }
-  bc && (bc.onmessage = (e)=>onSignal(e.data));
-  window.addEventListener('storage', (e)=>{
-    if (e.key !== LS_KEY || !e.newValue) return;
-    try{ const raw = e.newValue.split('::')[0]; onSignal(JSON.parse(raw)); }catch{}
-  });
-
-  // ===== Canvas Visualizer (springy radial bars with glow + hue shift) =====
-  const vis = new Map(); // key -> {ctx, analyser, raf, cvs, ema[], vel[], ranges}
-  function createCanvas(size=240){
-    const cvs = document.createElement('canvas');
-    cvs.width = size; cvs.height = size;
-    cvs.className = 'viz-canvas';
-    return cvs;
-  }
-  function attachVisualizer(key, mediaStream, mountEl){
-    detachVisualizer(key);
-    try{
-      const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      const src = audioCtx.createMediaStreamSource(mediaStream);
-      const an = audioCtx.createAnalyser();
-      an.fftSize = 2048; an.smoothingTimeConstant = 0.76;
-      src.connect(an);
-      const data = new Uint8Array(an.frequencyBinCount);
-
-      const cvs = createCanvas();
-      mountEl.appendChild(cvs);
-      const cx = cvs.getContext('2d');
-
-      const N = 48;                      // radial bars
-      const ema = new Array(N).fill(0);
-      const vel = new Array(N).fill(0);
-      const k = 0.22, d = 0.18;          // spring stiffness/damping
-      const baseR = 62, minH = 12, maxH = 50;
-      let hue = 210;
-
-      // log frequency mapping
-      const sampleRate = audioCtx.sampleRate || 48000;
-      const maxFreq = sampleRate/2;
-      const ranges = [];
-      for (let i=0;i<N;i++){
-        const f1 = 60*Math.pow(maxFreq/60, i/N);
-        const f2 = 60*Math.pow(maxFreq/60, (i+1)/N);
-        const b1 = Math.max(1, Math.floor(f1/maxFreq*data.length));
-        const b2 = Math.min(data.length-1, Math.ceil(f2/maxFreq*data.length));
-        ranges.push([b1,b2]);
-      }
-
-      function draw(){
-        an.getByteFrequencyData(data);
-        // compute smoothed targets
-        let energy = 0;
-        const tgt = new Array(N).fill(0);
-        for (let i=0;i<N;i++){
-          const [b1,b2]=ranges[i]; let s=0,c=0;
-          for(let b=b1;b<=b2;b++){ s+=data[b]; c++; }
-          const avg = c ? (s/c)/255 : 0;
-          energy += avg;
-          tgt[i] = tgt[i]*0.0 + avg; // base (we’ll spring to this)
-        }
-        energy = Math.min(1, (energy/N)*1.3);
-        hue = 200 + energy*45; // color shift with energy
-
-        // neighbor coupling then spring physics
-        const coupled = tgt.slice();
-        for (let i=0;i<N;i++){
-          const n1 = (i>0?tgt[i-1]:tgt[i]);
-          const n2 = (i<N-1?tgt[i+1]:tgt[i]);
-          coupled[i] = tgt[i]*0.78 + (n1+n2)*0.11;
-        }
-        for (let i=0;i<N;i++){
-          const a = k*(coupled[i] - ema[i]) - d*vel[i];
-          vel[i] += a;
-          ema[i] += vel[i];
-          if (ema[i]<0) ema[i]=0;
-        }
-
-        // draw radial bars with glow
-        cx.clearRect(0,0,cvs.width,cvs.height);
-        cx.save();
-        cx.translate(cvs.width/2, cvs.height/2);
-        cx.lineCap = 'round';
-        const radius = baseR;
-        const bars = N;
-        cx.shadowBlur = 18;
-        cx.shadowColor = `hsla(${hue}, 95%, 65%, .55)`;
-        for (let i=0;i<bars;i++){
-          const ang = (i/bars) * Math.PI*2;
-          const val = Math.min(1, ema[i]*1.4);
-          const h = minH + (maxH-minH)*val;
-          const x1 = Math.cos(ang)*radius;
-          const y1 = Math.sin(ang)*radius;
-          const x2 = Math.cos(ang)*(radius + h);
-          const y2 = Math.sin(ang)*(radius + h);
-          cx.strokeStyle = `hsla(${hue + i*0.6}, 85%, ${55 + val*25}%, ${0.55 + val*0.35})`;
-          cx.lineWidth = 3.5 + val*2.2;
-          cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
-        }
-        cx.restore();
-        raf = requestAnimationFrame(draw);
-      }
-      let raf = requestAnimationFrame(draw);
-      vis.set(key, {ctx:audioCtx, analyser:an, raf, cvs, ema, vel, ranges});
-    }catch{}
-  }
-  function detachVisualizer(key){
-    const v = vis.get(key); if (!v) return;
-    try{ cancelAnimationFrame(v.raf); }catch{}
-    try{ v.ctx.close(); }catch{}
-    try{ v.cvs.remove(); }catch{}
-    vis.delete(key);
-  }
-
-  // ===== Tiles =====
-  function enterAnimateTile(el){ el.classList.add('tile-enter'); requestAnimationFrame(()=>{ el.classList.add('tile-enter-active'); el.classList.remove('tile-enter'); setTimeout(()=>el.classList.remove('tile-enter-active'),240); }); }
-  function ensureTile(id){
-    let el = document.querySelector(`[data-peer="${id}"]`);
-    if (el) return el;
-    el = document.createElement('div');
-    el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
-    el.dataset.peer = id;
-    el.innerHTML = `
-      <audio autoplay playsinline></audio>
-      <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
-      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>${id.slice(0,6)}</div>`;
-    grid.append(el); enterAnimateTile(el); updateLayout();
-    return el;
-  }
-  function ensureSelfTile(){
-    let el = document.querySelector('[data-self="1"]');
-    if (el) return el;
-    el = document.createElement('div');
-    el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
-    el.setAttribute('data-self','1');
-    el.innerHTML = `
-      <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
-      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>(you)</div>`;
-    grid.prepend(el); enterAnimateTile(el); updateLayout();
-    return el;
-  }
-  function ensureShareTile(ownerId, labelText){
-    let el = document.querySelector(`[data-share="${ownerId}"]`);
-    if (el) return el;
-    el = document.createElement('div');
-    el.className = 'tile relative rounded-xl overflow-hidden bg-black';
-    el.dataset.share = ownerId;
-    el.innerHTML = `
-      <video autoplay playsinline muted class="w-full h-full object-contain bg-black"></video>
-      <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60">${escapeHtml(labelText || 'Screen')}</div>`;
-    grid.append(el); enterAnimateTile(el); updateLayout();
-    return el;
-  }
-  function removeShareTile(ownerId){ const el = document.querySelector(`[data-share="${ownerId}"]`); if (el) el.remove(); updateLayout(); }
-  function labelPeer(id, name){
-    const el = document.querySelector(`[data-peer="${id}"] [data-label]`); if (el) el.textContent = name;
-    const badge = document.querySelector(`[data-peer="${id}"] [data-initial]`); if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase();
-  }
-  function labelSelf(name){
-    const el = document.querySelector('[data-self="1"] [data-label]'); if (el) el.textContent = `${escapeHtml(name)} (you)`;
-    const badge = document.querySelector('[data-self="1"] [data-initial]'); if (badge) badge.textContent = (name||'?').trim().charAt(0).toUpperCase();
-  }
-
-  // ===== WebRTC =====
-  function createPC(id){
-    const pc = new RTCPeerConnection(iceConfig);
-    try{ pc.addTransceiver('audio',{direction:'recvonly'}); }catch{}
-    try{ pc.addTransceiver('video',{direction:'recvonly'}); }catch{}
-
-    if (sendStream) sendStream.getAudioTracks().forEach(t=>pc.addTrack(t, sendStream));
-    if (screenStream){
-      const vTrack = screenStream.getVideoTracks()[0];
-      if (vTrack){ const sender = pc.addTrack(vTrack, screenStream); screenSenders.set(id, sender); }
-    }
-
-    pc.ontrack = (e)=>{
-      const [stream] = e.streams;
-      const track = e.track;
-      if (track.kind === 'audio'){
-        const el = ensureTile(id);
-        const a = el.querySelector('audio');
-        if (a){
-          a.srcObject = stream;
-          a.muted = deafenBtn.getAttribute('aria-pressed')==='true';
-          a.play().catch(()=>{});
-          const sink = spkSelect.value; if (sink && typeof a.setSinkId==='function') a.setSinkId(sink).catch(()=>{});
-        }
-        const mount = el.querySelector('.avatar-wrap');
-        attachVisualizer(id, stream, mount);
-      }
-      if (track.kind === 'video'){
-        const label = `${peerNames.get(id) || id.slice(0,6)} — Screen`;
-        const shareEl = ensureShareTile(id, label);
-        const v = shareEl.querySelector('video'); if (v){ v.srcObject = stream; v.play().catch(()=>{}); }
-        track.onended = ()=> removeShareTile(id);
-      }
-    };
-    pc.onicecandidate = (e)=>{ if (e.candidate) send({t:'ice', to:id, c:e.candidate}); };
-    pc.onconnectionstatechange = ()=>{ const s=pc.connectionState; if (s==='failed'||s==='disconnected'||s==='closed'){ removePeer(id); } };
-
-    peers.set(id, pc); ensureTile(id); refreshStatus(); return pc;
-  }
-  async function makeOffer(to){
-    const pc = peers.get(to) || createPC(to);
-    const offer = await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
-    await pc.setLocalDescription(offer);
-    send({t:'offer', to, s:pc.localDescription, id:makeId()});
-  }
-  async function makeAnswer(from, sdp){
-    const pc = peers.get(from) || createPC(from);
-    await pc.setRemoteDescription(sdp);
-    const ans = await pc.createAnswer();
-    await pc.setLocalDescription(ans);
-    send({t:'answer', to:from, s:pc.localDescription, id:makeId()});
-  }
-  async function renegotiateAll(){ for(const id of peers.keys()){ try{ await makeOffer(id); }catch{} } }
-  function removePeer(id){
-    detachVisualizer(id);
-    const sender = screenSenders.get(id);
-    if (sender){ try{ sender.transport && sender.transport.stop && sender.transport.stop(); }catch{} screenSenders.delete(id); }
-    const pc = peers.get(id); if(pc) try{pc.close();}catch{}
-    peers.delete(id);
-    const el = document.querySelector(`[data-peer="${id}"]`); if(el) el.remove();
-    removeShareTile(id);
-    refreshStatus();
-  }
-
-  // ===== Mic: enumerate + boosted send chain =====
-  async function populateDevices(){
-    try{
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      const mics = devs.filter(d=>d.kind==='audioinput');
-      const spks = devs.filter(d=>d.kind==='audiooutput');
-      micSelect.innerHTML = mics.length ? mics.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Microphone')}</option>`).join('') : `<option value="">No microphones</option>`;
-      spkSelect.innerHTML = `<option value="">Default speaker</option>` + spks.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Speaker')}</option>`).join('');
-    }catch{}
-  }
-  async function startMic(deviceId){
-    if (!isSecure){ show('Use HTTPS for mic'); return null; }
-    try{
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: deviceId?{exact:deviceId}:undefined, echoCancellation:true, noiseSuppression:true, autoGainControl:true },
-        video:false
-      });
-      return stream;
-    }catch{ return null; }
-  }
-  async function buildSendChain(fromStream){
-    if (sendCtx) { try{ sendCtx.close(); }catch{} sendCtx=null; }
-    sendCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const src = sendCtx.createMediaStreamSource(fromStream);
-    const gain = sendCtx.createGain(); gain.gain.value = 1.65; // louder to others
-    sendGainNode = gain;
-    const comp = sendCtx.createDynamicsCompressor();
-    comp.threshold.value = -24; comp.knee.value = 20; comp.ratio.value = 3.2; comp.attack.value = 0.003; comp.release.value = 0.25;
-    const dest = sendCtx.createMediaStreamDestination();
-    src.connect(gain).connect(comp).connect(dest);
-    sendStream = dest.stream;
-  }
-  async function attachMicStream(stream){
-    if (localStream) localStream.getTracks().forEach(t=>t.stop());
-    localStream = stream;
-    await buildSendChain(localStream);
-
-    ensureSelfTile(); labelSelf(displayName);
-    const mount = document.querySelector('[data-self="1"] .avatar-wrap');
-    detachVisualizer('self');
-    attachVisualizer('self', localStream, mount);
-
-    const track = localStream?.getAudioTracks?.()[0];
-    const enabled = !!(track && track.enabled!==false);
-    micOn.classList.toggle('hidden', !enabled);
-    micOff.classList.toggle('hidden', enabled);
-
-    peers.forEach(pc=>{
-      const senders = pc.getSenders().filter(s=>s.track && s.track.kind==='audio');
-      if (senders.length===0 && sendStream){
-        sendStream.getTracks().forEach(t=>pc.addTrack(t, sendStream));
-      } else if (sendStream){
-        senders.forEach(s=>s.replaceTrack(sendStream.getAudioTracks()[0]||null));
-      }
-    });
-    await renegotiateAll();
-  }
-
-  // ===== Self monitor =====
-  function isMonitorOn(){ return monitorBtn.getAttribute('aria-pressed')==='true'; }
-  function stopMonitor(){
-    if (!isMonitorOn()) return;
-    try{ monitorSource?.disconnect(); monitorGainNode?.disconnect(); monitorCtx?.close(); }catch{}
-    monitorCtx = monitorGainNode = monitorSource = null;
-    monitorBtn.setAttribute('aria-pressed','false'); monitorBtn.textContent='Monitor: Off';
-    monitorBtn.classList.remove('bg-blue-700'); monitorBtn.classList.add('bg-slate-800');
-  }
-  async function startMonitor(){
-    if (isMonitorOn() || !localStream){ if(!localStream) show('Mic not available'); return; }
-    try{
-      monitorCtx = new (window.AudioContext||window.webkitAudioContext)();
-      const monSrc = monitorCtx.createMediaStreamSource(sendStream || localStream);
-      monitorSource = monSrc;
-      monitorGainNode = monitorCtx.createGain();
-      monitorGainNode.gain.value = (parseInt(monitorGain.value,10)||40)/100;
-      monSrc.connect(monitorGainNode).connect(monitorCtx.destination);
-      monitorBtn.setAttribute('aria-pressed','true'); monitorBtn.textContent='Monitor: On';
-      monitorBtn.classList.add('bg-blue-700'); monitorBtn.classList.remove('bg-slate-800');
-    }catch{}
-  }
-
-  // ===== Screen share =====
-  async function startPresent(){
-    if (screenStream) return;
-    try{
-      screenStream = await navigator.mediaDevices.getDisplayMedia({ video:{ frameRate:24 }, audio:true });
-      const selfShare = ensureShareTile('self', `${displayName} — Screen`);
-      const v = selfShare.querySelector('video'); if (v){ v.srcObject = screenStream; v.muted = true; v.play().catch(()=>{}); }
-      const vTrack = screenStream.getVideoTracks()[0];
-      if (vTrack){
-        for (const [pid, pc] of peers.entries()){
-          const sender = pc.addTrack(vTrack, screenStream);
-          screenSenders.set(pid, sender);
-        }
-        vTrack.onended = stopPresent;
-      }
-      await renegotiateAll();
-      presentBtn.setAttribute('aria-pressed','true'); presentBtn.textContent='Stop Presenting';
-      presentBtn.classList.add('bg-blue-700'); presentBtn.classList.remove('bg-slate-800');
-      show('Presenting your screen');
-    }catch{ screenStream=null; show('Screen share cancelled'); }
-  }
-  async function stopPresent(){
-    if (!screenStream) return;
-    try{
-      for (const [pid, pc] of peers.entries()){
-        const sender = screenSenders.get(pid);
-        if (sender){ try{ pc.removeTrack(sender); }catch{} screenSenders.delete(pid); }
-      }
-      screenStream.getTracks().forEach(t=>t.stop());
-      screenStream=null;
-      removeShareTile('self');
-      await renegotiateAll();
-    }finally{
-      presentBtn.setAttribute('aria-pressed','false'); presentBtn.textContent='Present';
-      presentBtn.classList.remove('bg-blue-700'); presentBtn.classList.add('bg-slate-800');
-      show('Presentation ended');
-    }
-  }
-
-  // ===== Chat (dedup — messages show once) =====
-  let unread = 0, chatOpen = false;
-  function setUnread(n){ unread=Math.max(0,n); chatBadge.textContent=String(unread); chatBadge.classList.toggle('hidden',unread===0); }
-  function openChat(){ chatPanel.classList.remove('hidden'); chatOpen=true; setUnread(0); chatInput.focus(); }
-  function closeChat(){ chatPanel.classList.add('hidden'); chatOpen=false; }
-  function pushMsg(who, text, mine=false){
-    const wrap = document.createElement('div'); wrap.className='msg-enter';
-    wrap.innerHTML = `
-      <div class="flex ${mine?'justify-end':''}">
-        <div class="max-w-[16rem] px-3 py-2 rounded-lg ${mine?'bg-blue-600 text-white':'bg-slate-800 border border-slate-700'}">
-          <div class="text-[11px] opacity-80 mb-1">${escapeHtml(who)}</div>
-          <div class="text-sm break-words">${escapeHtml(text)}</div>
+    <!-- Chat -->
+    <aside id="chatPanel" class="w-[22rem] max-w-[90vw] border-l border-slate-800 bg-slate-950/60 backdrop-blur-md hidden md:flex md:flex-col">
+      <div class="flex items-center justify-between px-3 py-2 border-b border-slate-800">
+        <div class="text-sm text-slate-300">Room chat</div>
+        <button id="chatClose" class="text-xs px-2 py-1 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700">Close</button>
+      </div>
+      <div id="chatList" class="flex-1 px-3 py-2 overflow-auto space-y-2"></div>
+      <div class="p-3 border-t border-slate-800">
+        <div class="flex gap-2">
+          <input id="chatInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Message"/>
+          <button id="chatSend" class="px-3 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500 text-xs">Send</button>
         </div>
-      </div>`;
-    chatList.append(wrap);
-    requestAnimationFrame(()=>{ wrap.classList.add('msg-enter-active'); wrap.classList.remove('msg-enter'); setTimeout(()=>wrap.classList.remove('msg-enter-active'),200); });
-    chatList.scrollTop = chatList.scrollHeight;
-    if (!mine && !chatOpen){ setUnread(unread+1); }
-  }
-  function sendChat(){
-    const txt = (chatInput.value||'').trim(); if (!txt) return;
-    pushMsg(displayName, txt, true);               // show once locally
-    send({t:'chat', name:displayName, text:txt, id:makeId()}); // send with ID -> dedup
-    chatInput.value='';
-  }
+      </div>
+    </aside>
+  </main>
 
-  chatToggle.onclick = ()=>{ chatOpen? closeChat() : openChat(); };
-  chatClose.onclick = closeChat;
-  chatSend.onclick = sendChat;
-  chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+  <!-- Controls -->
+  <div class="flex items-center justify-center py-4 border-t border-slate-800 bg-slate-950/80">
+    <div class="flex items-center gap-3 px-3 py-2 rounded-full border border-slate-700 bg-slate-900/90 shadow-lg">
+      <button id="micBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Toggle microphone" aria-pressed="false">
+        <span id="micIcon" class="text-lg">🎤</span>
+      </button>
 
-  // ===== Signaling handler =====
-  async function handleSignal(m){
-    if (m.t==='hello'){
-      ensureTile(m.from); labelPeer(m.from, m.name||m.from); peerNames.set(m.from, m.name||m.from);
-      if (myId > m.from) await makeOffer(m.from);
-      send({t:'meta', name:displayName, id:makeId()});
-      refreshStatus();
-    } else if (m.t==='meta'){
-      ensureTile(m.from); labelPeer(m.from, m.name||m.from); peerNames.set(m.from, m.name||m.from);
-      refreshStatus();
-    } else if (m.t==='offer' && m.to===myId){
-      await makeAnswer(m.from, m.s);
-    } else if (m.t==='answer' && m.to===myId){
-      const pc = peers.get(m.from) || createPC(m.from);
-      await pc.setRemoteDescription(m.s);
-    } else if (m.t==='ice' && m.to===myId){
-      const pc = peers.get(m.from) || createPC(m.from);
-      if (m.c) { try{ await pc.addIceCandidate(m.c); }catch{} }
-    } else if (m.t==='bye'){
-      removePeer(m.from);
-    } else if (m.t==='chat'){
-      pushMsg(m.name||m.from, m.text||'');
+      <button id="deafenBtn" class="w-12 h-12 rounded-full grid place-items-center bg-slate-800 hover:bg-slate-700" title="Mute speakers" aria-pressed="false">
+        <span id="deafenIcon" class="text-lg">🔊</span>
+      </button>
+
+      <button id="monitorBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-blue-700 hover:bg-blue-600 text-xs" aria-pressed="true" title="Hear your own mic">
+        Monitor: On
+      </button>
+      <input id="monitorGain" type="range" min="0" max="100" value="40" class="w-28" title="Monitor volume">
+
+      <button id="presentBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs" aria-pressed="false" title="Share your screen">
+        Present
+      </button>
+
+      <button id="speakerTest" class="text-xs px-2 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700">Speaker test</button>
+      <button id="leaveBtn" class="w-12 h-12 rounded-full grid place-items-center bg-red-800 hover:bg-red-700" title="Leave">
+        <span class="text-lg">🚪</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Diagnostics -->
+  <details class="px-4 pb-3 text-xs text-slate-400">
+    <summary>Diagnostics</summary>
+    <div id="diag" class="diag mt-2"></div>
+  </details>
+
+  <!-- Join overlay -->
+  <div id="joinOverlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm grid place-items-center">
+    <div class="w-full max-w-md mx-auto p-6 rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
+      <h2 class="text-lg font-semibold mb-2">Join Global Room</h2>
+      <p class="text-sm text-slate-400 mb-4">Choose a display name and click Join.</p>
+      <div class="flex items-center gap-2">
+        <input id="nameInput" class="flex-1 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800" placeholder="Your name"/>
+        <button id="joinBtn" class="px-4 py-2 rounded-lg border border-blue-700 bg-blue-600 hover:bg-blue-500">Join</button>
+      </div>
+      <p class="mt-2 text-xs text-slate-500">Vercel is HTTPS by default. If no mic prompt: click the site lock icon → allow Microphone → press <span class="kbd">Retest</span>.</p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-4 px-3 py-2 rounded-md border border-slate-700 bg-slate-900 text-sm hidden"></div>
+
+  <script>
+  (function(){
+    // ---------- DOM ----------
+    const grid = document.getElementById('grid');
+    const statusEl = document.getElementById('status');
+    const toast = document.getElementById('toast');
+    const micBtn = document.getElementById('micBtn');
+    const micIcon = document.getElementById('micIcon');
+    const deafenBtn = document.getElementById('deafenBtn');
+    const deafenIcon = document.getElementById('deafenIcon');
+    const monitorBtn = document.getElementById('monitorBtn');
+    const monitorGain = document.getElementById('monitorGain');
+    const presentBtn = document.getElementById('presentBtn');
+    const speakerTestBtn = document.getElementById('speakerTest');
+    const leaveBtn = document.getElementById('leaveBtn');
+    const micSelect = document.getElementById('micSelect');
+    const spkSelect = document.getElementById('spkSelect');
+    const micRetest = document.getElementById('micRetest');
+    const chatPanel = document.getElementById('chatPanel');
+    const chatToggle = document.getElementById('chatToggle');
+    const chatClose = document.getElementById('chatClose');
+    const chatList = document.getElementById('chatList');
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
+    const chatBadge = document.getElementById('chatBadge');
+    const joinOverlay = document.getElementById('joinOverlay');
+    const nameInput = document.getElementById('nameInput');
+    const joinBtn = document.getElementById('joinBtn');
+    const diag = document.getElementById('diag');
+
+    // ---------- Helpers ----------
+    const SAME_URL_KEY = location.origin + location.pathname; // both tabs must match this exactly
+    function show(t){ toast.textContent=t; toast.classList.remove('hidden'); clearTimeout(show._t); show._t=setTimeout(()=>toast.classList.add('hidden'),1400); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+    function updateLayout(){
+      const n = document.querySelectorAll('#grid .tile').length;
+      let cols=1; if(n===1)cols=1; else if(n===2)cols=2; else if(n<=4)cols=2; else if(n<=6)cols=3; else if(n<=9)cols=3; else cols=4;
+      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
     }
-  }
-
-  // ===== Controls =====
-  micBtn.onclick = ()=>{
-    const track = localStream?.getAudioTracks?.()[0];
-    if (!track){ show('Mic not available'); return; }
-    track.enabled = !track.enabled;
-    micOn.classList.toggle('hidden', !track.enabled);
-    micOff.classList.toggle('hidden', track.enabled);
-    micBtn.setAttribute('aria-pressed', String(!track.enabled));
-    micBtn.classList.toggle('bg-red-700', !track.enabled);
-    micBtn.classList.toggle('hover:bg-red-600', !track.enabled);
-    micBtn.classList.toggle('bg-slate-800', track.enabled);
-    micBtn.classList.toggle('hover:bg-slate-700', track.enabled);
-    show(track.enabled ? 'Unmuted' : 'Muted');
-  };
-  let deafened = false;
-  deafenBtn.onclick = ()=>{
-    deafened = !deafened;
-    document.querySelectorAll('[data-peer] audio').forEach(a=>a.muted = deafened);
-    document.getElementById('deafenOn').classList.toggle('hidden', deafened);
-    document.getElementById('deafenOff').classList.toggle('hidden', !deafened);
-    deafenBtn.setAttribute('aria-pressed', String(deafened));
-    deafenBtn.classList.toggle('bg-yellow-700', deafened);
-    deafenBtn.classList.toggle('hover:bg-yellow-600', deafened);
-    deafenBtn.classList.toggle('bg-slate-800', !deafened);
-    deafenBtn.classList.toggle('hover:bg-slate-700', !deafened);
-    document.querySelectorAll('audio,video').forEach(a=>a.play().catch(()=>{}));
-  };
-  monitorBtn.onclick = ()=>{ if (isMonitorOn()) stopMonitor(); else startMonitor(); };
-  monitorGain.oninput = ()=>{ if (monitorGainNode) monitorGainNode.gain.value=(parseInt(monitorGain.value,10)||0)/100; };
-  presentBtn.onclick = async ()=>{ if (presentBtn.getAttribute('aria-pressed')==='true') await stopPresent(); else await startPresent(); };
-  speakerTestBtn.onclick = async ()=>{
-    try{ const ctx=new(window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain();
-      o.type='sine'; o.frequency.value=880; g.gain.value=.06; o.connect(g).connect(ctx.destination); o.start(); setTimeout(()=>{o.stop(); ctx.close();}, 350);
-    }catch{ show('Speaker test failed'); }
-  };
-  leaveBtn.onclick = ()=>{ send({t:'bye', id:makeId()}); peers.forEach(pc=>{try{pc.close();}catch{}}); peers.clear(); stopMonitor(); stopPresent(); location.reload(); };
-
-  // ===== Join flow =====
-  async function populateAndStartMic(){
-    await populateDevices();
-    const stream = await startMic(micSelect.value || undefined);
-    if (stream){
-      await attachMicStream(stream);
-      await startMonitor();
-      micOn.classList.remove('hidden'); micOff.classList.add('hidden');
-      show('Mic ready (boosted to others)');
-    } else {
-      show('Mic blocked or not found');
-      statusEl.textContent = 'Mic unavailable — you can still hear others';
+    function refreshStatus(){ statusEl.textContent = `Online • ${peers.size} peer${peers.size===1?'':'s'}`; }
+    async function unlockAudio(){
+      document.querySelectorAll('audio,video').forEach(a=>{ try{ a.play(); }catch{} });
+      try{ const ctx=new(window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') await ctx.resume(); ctx.close(); }catch{}
     }
-  }
-  async function beginJoin(){
-    displayName = (nameInput.value||'').trim() || 'Guest';
-    localStorage.setItem('displayName', displayName);
-    joinOverlay.classList.add('hidden');
+    async function logDiag(note, extra){
+      const ts = new Date().toISOString().slice(11,19);
+      diag.textContent += `[${ts}] ${note}${extra?': '+extra:''}\n`;
+    }
 
-    ensureSelfTile(); labelSelf(displayName);
-    await populateAndStartMic();
-    await unlockAudio();
+    // ---------- State ----------
+    nameInput.value = localStorage.getItem('displayName') || '';
+    let displayName = '';
+    let localStream = null;   // raw mic
+    let sendStream = null;    // boosted + compressed
+    let sendCtx = null, sendGainNode = null;
 
-    const burst = ()=>{ for(let i=0;i<3;i++) setTimeout(()=>{ send({t:'hello', name:displayName, id:makeId()}); send({t:'meta', name:displayName, id:makeId()}); }, i*120); };
-    burst();
-    const helloInt = setInterval(()=>{ send({t:'hello', name:displayName, id:makeId()}); }, 2000);
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) burst(); });
-    setTimeout(()=>{ for(const id of peers.keys()){ makeOffer(id).catch(()=>{}); } }, 200);
-    refreshStatus();
-    window.addEventListener('beforeunload', ()=>{ clearInterval(helloInt); send({t:'bye', id:makeId()}); stopMonitor(); stopPresent(); });
-  }
-  joinBtn.onclick = beginJoin;
-  nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') beginJoin(); });
+    let monitorCtx = null, monitorGainNode = null, monitorSource = null;
+    let screenStream = null;
+    const screenSenders = new Map();
+    const peerNames = new Map();
 
-  // Device change
-  micSelect.onchange = async ()=>{ const s = await startMic(micSelect.value || undefined); if (s){ await attachMicStream(s); if (isMonitorOn()){ stopMonitor(); startMonitor(); } show('Mic switched'); } else show('Mic switch failed'); };
-  spkSelect.onchange = async ()=>{ const sink = spkSelect.value||''; const audios = Array.from(document.querySelectorAll('audio')); for (const a of audios){ if (typeof a.setSinkId==='function'){ try{ await a.setSinkId(sink); }catch{} } } show('Speaker changed'); };
-  micRetest.onclick = async ()=>{ await populateAndStartMic(); };
+    const bc = (typeof BroadcastChannel!=='undefined') ? new BroadcastChannel('global-meet-local') : null;
+    const LS_KEY = 'gmeet-signal';
+    const myId = (crypto && crypto.randomUUID) ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10);
+    const peers = new Map();
+    const iceConfig = { iceServers:[{urls:'stun:stun.l.google.com:19302'}] };
+    const seenIds = new Set();
+    function makeId(){ return `${myId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2,7)}`; }
+    function markSeen(id){ seenIds.add(id); setTimeout(()=>seenIds.delete(id), 60000); }
+    function shouldAccept(m){ if (!m || !m.id) return true; if (seenIds.has(m.id)) return false; markSeen(m.id); return true; }
 
-  // Pre-join discovery ping (deduped)
-  setTimeout(()=>{ send({t:'hello', name:'(not joined yet)', id:makeId()}); }, 300);
+    function send(msg){
+      msg.url = SAME_URL_KEY;
+      msg.from = myId;
+      msg.id = msg.id || makeId();
+      markSeen(msg.id);
+      try{ bc && bc.postMessage(msg); }catch{}
+      try{ localStorage.setItem(LS_KEY, JSON.stringify(msg)+'::'+Math.random()); }catch{}
+    }
+    function onSignal(msg){
+      if (!msg || msg.url !== SAME_URL_KEY) return;
+      if (msg.from === myId) return;
+      if (!shouldAccept(msg)) return;
+      handleSignal(msg);
+    }
+    bc && (bc.onmessage = (e)=>onSignal(e.data));
+    window.addEventListener('storage', (e)=>{
+      if (e.key !== LS_KEY || !e.newValue) return;
+      try{ const raw = e.newValue.split('::')[0]; onSignal(JSON.parse(raw)); }catch{}
+    });
 
-  statusEl.textContent = 'Ready — pick a name';
-})();
-</script>
+    // ---------- Visualizer (radial spring bars) ----------
+    const vis = new Map(); // key -> {ctx, analyser, raf, cvs}
+    function createCanvas(size=240){
+      const cvs = document.createElement('canvas');
+      cvs.width = size; cvs.height = size;
+      cvs.className = 'viz-canvas';
+      return cvs;
+    }
+    function attachVisualizer(key, mediaStream, mountEl){
+      detachVisualizer(key);
+      try{
+        const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        const src = audioCtx.createMediaStreamSource(mediaStream);
+        const an = audioCtx.createAnalyser();
+        an.fftSize = 2048; an.smoothingTimeConstant = 0.76; src.connect(an);
+        const data = new Uint8Array(an.frequencyBinCount);
+
+        const cvs = createCanvas(); mountEl.appendChild(cvs);
+        const cx = cvs.getContext('2d');
+
+        const N = 48; const ema = new Array(N).fill(0); const vel = new Array(N).fill(0);
+        const k = 0.22, d = 0.18; const baseR = 62, minH = 12, maxH = 50;
+        let hue = 210;
+
+        const sampleRate = audioCtx.sampleRate || 48000;
+        const maxFreq = sampleRate/2, ranges=[];
+        for (let i=0;i<N;i++){
+          const f1 = 60*Math.pow(maxFreq/60, i/N);
+          const f2 = 60*Math.pow(maxFreq/60, (i+1)/N);
+          const b1 = Math.max(1, Math.floor(f1/maxFreq*data.length));
+          const b2 = Math.min(data.length-1, Math.ceil(f2/maxFreq*data.length));
+          ranges.push([b1,b2]);
+        }
+
+        function draw(){
+          an.getByteFrequencyData(data);
+          let energy = 0; const tgt = new Array(N).fill(0);
+          for (let i=0;i<N;i++){
+            const [b1,b2]=ranges[i]; let s=0,c=0; for(let b=b1;b<=b2;b++){ s+=data[b]; c++; }
+            const avg = c ? (s/c)/255 : 0; energy += avg; tgt[i] = avg;
+          }
+          energy = Math.min(1, (energy/N)*1.3); hue = 200 + energy*45;
+
+          // neighbor smoothing
+          const coupled = tgt.slice();
+          for (let i=0;i<N;i++){
+            const n1 = (i>0?tgt[i-1]:tgt[i]), n2 = (i<N-1?tgt[i+1]:tgt[i]);
+            coupled[i] = tgt[i]*0.78 + (n1+n2)*0.11;
+          }
+          // spring physics
+          for (let i=0;i<N;i++){
+            const a = k*(coupled[i]-ema[i]) - d*vel[i];
+            vel[i]+=a; ema[i]+=vel[i]; if (ema[i]<0) ema[i]=0;
+          }
+
+          // draw
+          cx.clearRect(0,0,cvs.width,cvs.height);
+          cx.save(); cx.translate(cvs.width/2, cvs.height/2); cx.lineCap='round';
+          cx.shadowBlur=18; cx.shadowColor = `hsla(${hue},95%,65%,.55)`;
+          for (let i=0;i<N;i++){
+            const ang=(i/N)*Math.PI*2; const val=Math.min(1, ema[i]*1.4);
+            const h = minH + (maxH-minH)*val;
+            const x1 = Math.cos(ang)*baseR, y1=Math.sin(ang)*baseR;
+            const x2 = Math.cos(ang)*(baseR+h), y2=Math.sin(ang)*(baseR+h);
+            cx.strokeStyle = `hsla(${hue + i*0.6},85%,${55 + val*25}%,${0.55 + val*0.35})`;
+            cx.lineWidth = 3.5 + val*2.2; cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+          }
+          cx.restore();
+          raf = requestAnimationFrame(draw);
+        }
+        let raf=requestAnimationFrame(draw);
+        vis.set(key,{ctx:audioCtx,analyser:an,raf,cvs});
+      }catch{}
+    }
+    function detachVisualizer(key){
+      const v=vis.get(key); if(!v) return;
+      try{ cancelAnimationFrame(v.raf);}catch{} try{ v.ctx.close(); }catch{} try{ v.cvs.remove(); }catch{}
+      vis.delete(key);
+    }
+
+    // ---------- Tiles ----------
+    function enterAnimateTile(el){ el.classList.add('tile-enter'); requestAnimationFrame(()=>{ el.classList.add('tile-enter-active'); el.classList.remove('tile-enter'); setTimeout(()=>el.classList.remove('tile-enter-active'),240); }); }
+    function ensureTile(id){
+      let el = document.querySelector(`[data-peer="${id}"]`);
+      if (el) return el;
+      el = document.createElement('div');
+      el.className = 'tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
+      el.dataset.peer = id;
+      el.innerHTML = `
+        <audio autoplay playsinline></audio>
+        <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
+        <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>${id.slice(0,6)}</div>`;
+      grid.append(el); enterAnimateTile(el); updateLayout();
+      return el;
+    }
+    function ensureSelfTile(){
+      let el=document.querySelector('[data-self="1"]');
+      if(el) return el;
+      el=document.createElement('div');
+      el.className='tile relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-700';
+      el.setAttribute('data-self','1');
+      el.innerHTML=`
+        <div class="avatar-wrap"><div class="avatar" data-initial>?</div></div>
+        <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60" data-label>(you)</div>`;
+      grid.prepend(el); enterAnimateTile(el); updateLayout();
+      return el;
+    }
+    function ensureShareTile(ownerId, labelText){
+      let el=document.querySelector(`[data-share="${ownerId}"]`);
+      if(el) return el;
+      el=document.createElement('div');
+      el.className='tile relative rounded-xl overflow-hidden bg-black';
+      el.dataset.share=ownerId;
+      el.innerHTML=`
+        <video autoplay playsinline muted class="w-full h-full object-contain bg-black"></video>
+        <div class="absolute left-2 bottom-2 text-xs px-2 py-1 rounded-md bg-black/60">${escapeHtml(labelText||'Screen')}</div>`;
+      grid.append(el); enterAnimateTile(el); updateLayout();
+      return el;
+    }
+    function removeShareTile(ownerId){ const el=document.querySelector(`[data-share="${ownerId}"]`); if(el) el.remove(); updateLayout(); }
+    function labelPeer(id,name){ const l=document.querySelector(`[data-peer="${id}"] [data-label]`); if(l) l.textContent=name; const b=document.querySelector(`[data-peer="${id}"] [data-initial]`); if(b) b.textContent=(name||'?').trim().charAt(0).toUpperCase(); }
+    function labelSelf(name){ const l=document.querySelector('[data-self="1"] [data-label]'); if(l) l.textContent=`${escapeHtml(name)} (you)`; const b=document.querySelector('[data-self="1"] [data-initial]'); if(b) b.textContent=(name||'?').trim().charAt(0).toUpperCase(); }
+
+    // ---------- WebRTC ----------
+    function createPC(id){
+      const pc = new RTCPeerConnection(iceConfig);
+      try{ pc.addTransceiver('audio',{direction:'recvonly'}); }catch{}
+      try{ pc.addTransceiver('video',{direction:'recvonly'}); }catch{}
+      // add our audio (boosted)
+      if (sendStream) sendStream.getAudioTracks().forEach(t=>pc.addTrack(t, sendStream));
+      // add our screen if on
+      if (screenStream){ const vTrack=screenStream.getVideoTracks()[0]; if(vTrack){ const sender=pc.addTrack(vTrack,screenStream); screenSenders.set(id,sender); } }
+
+      pc.ontrack = (e)=>{
+        const [stream] = e.streams; const track=e.track;
+        if (track.kind==='audio'){
+          const el=ensureTile(id); const a=el.querySelector('audio');
+          if (a){ a.srcObject=stream; a.muted=deafenBtn.getAttribute('aria-pressed')==='true'; a.play().catch(()=>{}); const sink=spkSelect.value; if(sink && typeof a.setSinkId==='function') a.setSinkId(sink).catch(()=>{}); }
+          const mount=el.querySelector('.avatar-wrap'); attachVisualizer(id, stream, mount);
+        }
+        if (track.kind==='video'){
+          const label=`${peerNames.get(id)||id.slice(0,6)} — Screen`;
+          const sEl=ensureShareTile(id,label); const v=sEl.querySelector('video'); if(v){ v.srcObject=stream; v.play().catch(()=>{}); }
+          track.onended = ()=> removeShareTile(id);
+        }
+      };
+      pc.onicecandidate = (e)=>{ if (e.candidate) send({t:'ice', to:id, c:e.candidate}); };
+      pc.onconnectionstatechange = ()=>{ const s=pc.connectionState; if (s==='failed'||s==='disconnected'||s==='closed'){ removePeer(id); } };
+
+      peers.set(id, pc); ensureTile(id); refreshStatus(); return pc;
+    }
+    async function makeOffer(to){
+      const pc = peers.get(to) || createPC(to);
+      const offer = await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+      await pc.setLocalDescription(offer);
+      send({t:'offer', to, s:pc.localDescription, id:makeId()});
+    }
+    async function makeAnswer(from, sdp){
+      const pc = peers.get(from) || createPC(from);
+      await pc.setRemoteDescription(sdp);
+      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+      send({t:'answer', to:from, s:pc.localDescription, id:makeId()});
+    }
+    async function renegotiateAll(){ for(const id of peers.keys()){ try{ await makeOffer(id); }catch{} } }
+    function removePeer(id){
+      detachVisualizer(id);
+      const sender=screenSenders.get(id); if(sender){ try{ sender.transport && sender.transport.stop && sender.transport.stop(); }catch{} screenSenders.delete(id); }
+      const pc=peers.get(id); if(pc) try{ pc.close(); }catch{}
+      peers.delete(id); const el=document.querySelector(`[data-peer="${id}"]`); if(el) el.remove(); removeShareTile(id); refreshStatus();
+    }
+
+    // ---------- Mic chain (boosted + compressor) ----------
+    async function populateDevices(){
+      try{
+        const devs=await navigator.mediaDevices.enumerateDevices();
+        const mics=devs.filter(d=>d.kind==='audioinput');
+        const spks=devs.filter(d=>d.kind==='audiooutput');
+        micSelect.innerHTML = mics.length ? mics.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Microphone')}</option>`).join('') : `<option value="">No microphones</option>`;
+        spkSelect.innerHTML = `<option value="">Default speaker</option>` + spks.map(d=>`<option value="${d.deviceId}">${escapeHtml(d.label||'Speaker')}</option>`).join('');
+      }catch(e){ await logDiag('enumerateDevices failed', e.name||e.message); }
+    }
+    async function startMic(deviceId){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: deviceId?{exact:deviceId}:undefined, echoCancellation:true, noiseSuppression:true, autoGainControl:true },
+          video:false
+        });
+        await logDiag('getUserMedia ok', `tracks=${stream.getAudioTracks().length}`);
+        return stream;
+      }catch(e){ await logDiag('getUserMedia error', `${e.name}: ${e.message}`); return null; }
+    }
+    async function buildSendChain(fromStream){
+      if (sendCtx) { try{ sendCtx.close(); }catch{} sendCtx=null; }
+      sendCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = sendCtx.createMediaStreamSource(fromStream);
+      const gain = sendCtx.createGain(); gain.gain.value = 1.65; // louder to others
+      sendGainNode = gain;
+      const comp = sendCtx.createDynamicsCompressor();
+      comp.threshold.value = -24; comp.knee.value = 20; comp.ratio.value = 3.2; comp.attack.value = 0.003; comp.release.value = 0.25;
+      const dest = sendCtx.createMediaStreamDestination();
+      src.connect(gain).connect(comp).connect(dest);
+      sendStream = dest.stream;
+    }
+    async function attachMicStream(stream){
+      if (localStream) localStream.getTracks().forEach(t=>t.stop());
+      localStream = stream; await buildSendChain(localStream);
+      ensureSelfTile(); labelSelf(displayName);
+      const mount = document.querySelector('[data-self="1"] .avatar-wrap');
+      detachVisualizer('self'); attachVisualizer('self', localStream, mount);
+      const track = localStream?.getAudioTracks?.()[0]; const on = !!(track && track.enabled!==false);
+      micIcon.textContent = on ? '🎤' : '🔇';
+      peers.forEach(pc=>{
+        const senders = pc.getSenders().filter(s=>s.track && s.track.kind==='audio');
+        if (senders.length===0 && sendStream){
+          sendStream.getTracks().forEach(t=>pc.addTrack(t, sendStream));
+        } else if (sendStream){
+          senders.forEach(s=>s.replaceTrack(sendStream.getAudioTracks()[0]||null));
+        }
+      });
+      await renegotiateAll();
+    }
+
+    // ---------- Self monitor ----------
+    function isMonitorOn(){ return monitorBtn.getAttribute('aria-pressed')==='true'; }
+    function stopMonitor(){
+      if (!isMonitorOn()) return;
+      try{ monitorSource?.disconnect(); monitorGainNode?.disconnect(); monitorCtx?.close(); }catch{}
+      monitorCtx = monitorGainNode = monitorSource = null;
+      monitorBtn.setAttribute('aria-pressed','false'); monitorBtn.textContent='Monitor: Off';
+      monitorBtn.classList.remove('bg-blue-700'); monitorBtn.classList.add('bg-slate-800');
+    }
+    async function startMonitor(){
+      if (isMonitorOn() || !localStream){ if(!localStream) show('Mic not available'); return; }
+      try{
+        monitorCtx = new (window.AudioContext||window.webkitAudioContext)();
+        const monSrc = monitorCtx.createMediaStreamSource(sendStream || localStream);
+        monitorSource = monSrc; monitorGainNode = monitorCtx.createGain();
+        monitorGainNode.gain.value = (parseInt(monitorGain.value,10)||40)/100;
+        monSrc.connect(monitorGainNode).connect(monitorCtx.destination);
+        monitorBtn.setAttribute('aria-pressed','true'); monitorBtn.textContent='Monitor: On';
+        monitorBtn.classList.add('bg-blue-700'); monitorBtn.classList.remove('bg-slate-800');
+      }catch(e){ await logDiag('monitor failed', e.name||e.message); }
+    }
+
+    // ---------- Screen share ----------
+    async function startPresent(){
+      if (screenStream) return;
+      try{
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video:{ frameRate:24 }, audio:true });
+        const selfShare = ensureShareTile('self', `${displayName} — Screen`);
+        const v = selfShare.querySelector('video'); if (v){ v.srcObject = screenStream; v.muted = true; v.play().catch(()=>{}); }
+        const vTrack = screenStream.getVideoTracks()[0];
+        if (vTrack){
+          for (const [pid, pc] of peers.entries()){
+            const sender = pc.addTrack(vTrack, screenStream);
+            screenSenders.set(pid, sender);
+          }
+          vTrack.onended = stopPresent;
+        }
+        await renegotiateAll();
+        presentBtn.setAttribute('aria-pressed','true'); presentBtn.textContent='Stop Presenting';
+        presentBtn.classList.add('bg-blue-700'); presentBtn.classList.remove('bg-slate-800');
+        show('Presenting your screen');
+      }catch{ screenStream=null; show('Screen share cancelled'); }
+    }
+    async function stopPresent(){
+      if (!screenStream) return;
+      try{
+        for (const [pid, pc] of peers.entries()){
+          const sender = screenSenders.get(pid);
+          if (sender){ try{ pc.removeTrack(sender); }catch{} screenSenders.delete(pid); }
+        }
+        screenStream.getTracks().forEach(t=>t.stop());
+        screenStream=null; removeShareTile('self'); await renegotiateAll();
+      }finally{
+        presentBtn.setAttribute('aria-pressed','false'); presentBtn.textContent='Present';
+        presentBtn.classList.remove('bg-blue-700'); presentBtn.classList.add('bg-slate-800');
+        show('Presentation ended');
+      }
+    }
+
+    // ---------- Chat (dedup; show once locally) ----------
+    let unread = 0, chatOpen = false;
+    function setUnread(n){ unread=Math.max(0,n); chatBadge.textContent=String(unread); chatBadge.classList.toggle('hidden',unread===0); }
+    function openChat(){ chatPanel.classList.remove('hidden'); chatOpen=true; setUnread(0); chatInput.focus(); }
+    function closeChat(){ chatPanel.classList.add('hidden'); chatOpen=false; }
+    function pushMsg(who, text, mine=false){
+      const wrap = document.createElement('div'); wrap.className='msg-enter';
+      wrap.innerHTML = `
+        <div class="flex ${mine?'justify-end':''}">
+          <div class="max-w-[16rem] px-3 py-2 rounded-lg ${mine?'bg-blue-600 text-white':'bg-slate-800 border border-slate-700'}">
+            <div class="text-[11px] opacity-80 mb-1">${escapeHtml(who)}</div>
+            <div class="text-sm break-words">${escapeHtml(text)}</div>
+          </div>
+        </div>`;
+      chatList.append(wrap);
+      requestAnimationFrame(()=>{ wrap.classList.add('msg-enter-active'); wrap.classList.remove('msg-enter'); setTimeout(()=>wrap.classList.remove('msg-enter-active'),200); });
+      chatList.scrollTop = chatList.scrollHeight;
+      if (!mine && !chatOpen){ setUnread(unread+1); }
+    }
+    function sendChat(){
+      const txt = (chatInput.value||'').trim(); if (!txt) return;
+      chatInput.value='';
+      pushMsg(displayName, txt, true); // show once
+      send({t:'chat', name:displayName, text:txt, id:makeId()});
+    }
+
+    // ---------- Signaling handler ----------
+    async function handleSignal(m){
+      if (m.t==='hello'){
+        ensureTile(m.from); labelPeer(m.from, m.name||m.from); peerNames.set(m.from, m.name||m.from);
+        if (myId > m.from) await makeOffer(m.from);
+        send({t:'meta', name:displayName, id:makeId()});
+        refreshStatus();
+      } else if (m.t==='meta'){
+        ensureTile(m.from); labelPeer(m.from, m.name||m.from); peerNames.set(m.from, m.name||m.from);
+        refreshStatus();
+      } else if (m.t==='offer' && m.to===myId){
+        await makeAnswer(m.from, m.s);
+      } else if (m.t==='answer' && m.to===myId){
+        const pc = peers.get(m.from) || createPC(m.from);
+        await pc.setRemoteDescription(m.s);
+      } else if (m.t==='ice' && m.to===myId){
+        const pc = peers.get(m.from) || createPC(m.from);
+        if (m.c) { try{ await pc.addIceCandidate(m.c); }catch{} }
+      } else if (m.t==='bye'){
+        removePeer(m.from);
+      } else if (m.t==='chat'){
+        pushMsg(m.name||m.from, m.text||'');
+      }
+    }
+
+    // ---------- Controls ----------
+    chatToggle.onclick = ()=>{ chatOpen? closeChat() : openChat(); };
+    chatClose.onclick = closeChat;
+    chatSend.onclick = sendChat;
+    chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+    micBtn.onclick = ()=>{
+      const track = localStream?.getAudioTracks?.()[0];
+      if (!track){ show('Mic not available'); return; }
+      track.enabled = !track.enabled;
+      micIcon.textContent = track.enabled ? '🎤' : '🔇';
+      micBtn.setAttribute('aria-pressed', String(!track.enabled));
+      micBtn.classList.toggle('bg-red-700', !track.enabled);
+      micBtn.classList.toggle('hover:bg-red-600', !track.enabled);
+      micBtn.classList.toggle('bg-slate-800', track.enabled);
+      micBtn.classList.toggle('hover:bg-slate-700', track.enabled);
+      show(track.enabled ? 'Unmuted' : 'Muted');
+    };
+
+    let deafened=false;
+    deafenBtn.onclick = ()=>{
+      deafened=!deafened;
+      document.querySelectorAll('[data-peer] audio').forEach(a=>a.muted=deafened);
+      deafenIcon.textContent = deafened ? '🔇' : '🔊';
+      deafenBtn.setAttribute('aria-pressed', String(deafened));
+      deafenBtn.classList.toggle('bg-yellow-700', deafened);
+      deafenBtn.classList.toggle('hover:bg-yellow-600', deafened);
+      deafenBtn.classList.toggle('bg-slate-800', !deafened);
+      deafenBtn.classList.toggle('hover:bg-slate-700', !deafened);
+      document.querySelectorAll('audio,video').forEach(a=>a.play().catch(()=>{}));
+    };
+
+    monitorBtn.onclick = ()=>{ if (monitorBtn.getAttribute('aria-pressed')==='true'){ stopMonitor(); } else { startMonitor(); } };
+    monitorGain.oninput = ()=>{ if (monitorGainNode) monitorGainNode.gain.value=(parseInt(monitorGain.value,10)||0)/100; };
+    presentBtn.onclick = async ()=>{ if (presentBtn.getAttribute('aria-pressed')==='true') await stopPresent(); else await startPresent(); };
+
+    speakerTestBtn.onclick = async ()=>{
+      try{ const ctx=new(window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='sine'; o.frequency.value=880; g.gain.value=.06; o.connect(g).connect(ctx.destination); o.start(); setTimeout(()=>{o.stop(); ctx.close();}, 350);
+      }catch{ show('Speaker test failed'); }
+    };
+
+    leaveBtn.onclick = ()=>{ send({t:'bye', id:makeId()}); peers.forEach(pc=>{try{pc.close();}catch{}}); peers.clear(); stopMonitor(); stopPresent(); location.reload(); };
+
+    // ---------- Join flow ----------
+    async function populateAndStartMic(){
+      await populateDevices();
+      const stream = await startMic(micSelect.value || undefined);
+      if (stream){
+        await attachMicStream(stream);
+        await startMonitor();
+        micIcon.textContent = '🎤';
+        show('Mic ready (boosted to others)');
+      } else {
+        show('Mic blocked or not found');
+        statusEl.textContent = 'Mic unavailable — you can still hear others';
+      }
+    }
+
+    async function beginJoin(){
+      displayName = (nameInput.value||'').trim() || 'Guest';
+      localStorage.setItem('displayName', displayName);
+      joinOverlay.classList.add('hidden');
+
+      ensureSelfTile(); labelSelf(displayName);
+      await populateAndStartMic();
+      await unlockAudio();
+
+      const burst = ()=>{ for(let i=0;i<3;i++) setTimeout(()=>{ send({t:'hello', name:displayName, id:makeId()}); send({t:'meta', name:displayName, id:makeId()}); }, i*120); };
+      burst();
+      const helloInt = setInterval(()=>{ send({t:'hello', name:displayName, id:makeId()}); }, 2000);
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) burst(); });
+      setTimeout(()=>{ for(const id of peers.keys()){ makeOffer(id).catch(()=>{}); } }, 200);
+      refreshStatus();
+      window.addEventListener('beforeunload', ()=>{ clearInterval(helloInt); send({t:'bye', id:makeId()}); stopMonitor(); stopPresent(); });
+    }
+
+    joinBtn.onclick = beginJoin;
+    nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') beginJoin(); });
+
+    // device actions
+    micSelect.onchange = async ()=>{ const s = await startMic(micSelect.value || undefined); if (s){ await attachMicStream(s); if (monitorBtn.getAttribute('aria-pressed')==='true'){ stopMonitor(); startMonitor(); } show('Mic switched'); } else show('Mic switch failed'); };
+    spkSelect.onchange = async ()=>{ const sink=spkSelect.value||''; const audios=Array.from(document.querySelectorAll('audio')); for(const a of audios){ if (typeof a.setSinkId==='function'){ try{ await a.setSinkId(sink); }catch(e){ await logDiag('setSinkId failed', e.name||e.message); } } } show('Speaker changed'); };
+    micRetest.onclick = async ()=>{ await populateAndStartMic(); };
+
+    // Kick discovery ping before join
+    setTimeout(()=>{ send({t:'hello', name:'(not joined yet)', id:makeId()}); }, 300);
+
+    statusEl.textContent = 'Ready — pick a name';
+  })();
+  </script>
 </body>
 </html>
